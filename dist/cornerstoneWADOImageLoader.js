@@ -1,4 +1,4 @@
-/*! cornerstone-wado-image-loader - 2.0.0 - 2017-12-08 | (c) 2016 Chris Hafey | https://github.com/cornerstonejs/cornerstoneWADOImageLoader */
+/*! cornerstone-wado-image-loader - 2.0.0 - 2018-04-06 | (c) 2016 Chris Hafey | https://github.com/cornerstonejs/cornerstoneWADOImageLoader */
 (function webpackUniversalModuleDefinition(root, factory) {
 	if(typeof exports === 'object' && typeof module === 'object')
 		module.exports = factory(require("dicom-parser"));
@@ -8,7 +8,7 @@
 		exports["cornerstoneWADOImageLoader"] = factory(require("dicom-parser"));
 	else
 		root["cornerstoneWADOImageLoader"] = factory(root["dicomParser"]);
-})(this, function(__WEBPACK_EXTERNAL_MODULE_46__) {
+})(typeof self !== 'undefined' ? self : this, function(__WEBPACK_EXTERNAL_MODULE_52__) {
 return /******/ (function(modules) { // webpackBootstrap
 /******/ 	// The module cache
 /******/ 	var installedModules = {};
@@ -71,7 +71,7 @@ return /******/ (function(modules) { // webpackBootstrap
 /******/ 	__webpack_require__.p = "";
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 39);
+/******/ 	return __webpack_require__(__webpack_require__.s = 45);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -86,11 +86,11 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports.external = exports.dicomParser = undefined;
 
-var _dicomParser = __webpack_require__(46);
+var _dicomParser = __webpack_require__(52);
 
 var dicomParser = _interopRequireWildcard(_dicomParser);
 
-var _registerLoaders = __webpack_require__(47);
+var _registerLoaders = __webpack_require__(53);
 
 var _registerLoaders2 = _interopRequireDefault(_registerLoaders);
 
@@ -127,11 +127,11 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports.internal = exports.xhrRequest = exports.getOptions = exports.setOptions = undefined;
 
-var _xhrRequest = __webpack_require__(50);
+var _xhrRequest = __webpack_require__(56);
 
 var _xhrRequest2 = _interopRequireDefault(_xhrRequest);
 
-var _options = __webpack_require__(6);
+var _options = __webpack_require__(4);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -228,6 +228,316 @@ exports.default = getValue;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
+exports.setOptions = setOptions;
+exports.getOptions = getOptions;
+var options = {
+  // callback allowing customization of the xhr (e.g. adding custom auth headers, cors, etc)
+  beforeSend: function beforeSend() /* xhr, imageId */{},
+
+  // callback allowing modification of newly created image objects
+  imageCreated: function imageCreated() /* image */{},
+
+  strict: false,
+  decodeConfig: {}
+};
+
+function setOptions(newOptions) {
+  Object.keys(newOptions).forEach(function (key) {
+    options[key] = newOptions[key];
+  });
+}
+
+function getOptions() {
+  return options;
+}
+
+/***/ }),
+/* 5 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+var charLS = void 0;
+
+function jpegLSDecode(data, isSigned) {
+  // prepare input parameters
+  var dataPtr = charLS._malloc(data.length);
+
+  charLS.writeArrayToMemory(data, dataPtr);
+
+  // prepare output parameters
+  var imagePtrPtr = charLS._malloc(4);
+  var imageSizePtr = charLS._malloc(4);
+  var widthPtr = charLS._malloc(4);
+  var heightPtr = charLS._malloc(4);
+  var bitsPerSamplePtr = charLS._malloc(4);
+  var stridePtr = charLS._malloc(4);
+  var allowedLossyErrorPtr = charLS._malloc(4);
+  var componentsPtr = charLS._malloc(4);
+  var interleaveModePtr = charLS._malloc(4);
+
+  // Decode the image
+  var result = charLS.ccall('jpegls_decode', 'number', ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'], [dataPtr, data.length, imagePtrPtr, imageSizePtr, widthPtr, heightPtr, bitsPerSamplePtr, stridePtr, componentsPtr, allowedLossyErrorPtr, interleaveModePtr]);
+
+  // Extract result values into object
+  var image = {
+    result: result,
+    width: charLS.getValue(widthPtr, 'i32'),
+    height: charLS.getValue(heightPtr, 'i32'),
+    bitsPerSample: charLS.getValue(bitsPerSamplePtr, 'i32'),
+    stride: charLS.getValue(stridePtr, 'i32'),
+    components: charLS.getValue(componentsPtr, 'i32'),
+    allowedLossyError: charLS.getValue(allowedLossyErrorPtr, 'i32'),
+    interleaveMode: charLS.getValue(interleaveModePtr, 'i32'),
+    pixelData: undefined
+  };
+
+  // Copy image from emscripten heap into appropriate array buffer type
+  var imagePtr = charLS.getValue(imagePtrPtr, '*');
+
+  if (image.bitsPerSample <= 8) {
+    image.pixelData = new Uint8Array(image.width * image.height * image.components);
+    image.pixelData.set(new Uint8Array(charLS.HEAP8.buffer, imagePtr, image.pixelData.length));
+  } else if (isSigned) {
+    image.pixelData = new Int16Array(image.width * image.height * image.components);
+    image.pixelData.set(new Int16Array(charLS.HEAP16.buffer, imagePtr, image.pixelData.length));
+  } else {
+    image.pixelData = new Uint16Array(image.width * image.height * image.components);
+    image.pixelData.set(new Uint16Array(charLS.HEAP16.buffer, imagePtr, image.pixelData.length));
+  }
+
+  // free memory and return image object
+  charLS._free(dataPtr);
+  charLS._free(imagePtr);
+  charLS._free(imagePtrPtr);
+  charLS._free(imageSizePtr);
+  charLS._free(widthPtr);
+  charLS._free(heightPtr);
+  charLS._free(bitsPerSamplePtr);
+  charLS._free(stridePtr);
+  charLS._free(componentsPtr);
+  charLS._free(interleaveModePtr);
+
+  return image;
+}
+
+function initializeJPEGLS() {
+  // check to make sure codec is loaded
+  if (typeof CharLS === 'undefined') {
+    throw new Error('No JPEG-LS decoder loaded');
+  }
+
+  // Try to initialize CharLS
+  // CharLS https://github.com/cornerstonejs/charls
+  if (!charLS) {
+    charLS = CharLS();
+    if (!charLS || !charLS._jpegls_decode) {
+      throw new Error('JPEG-LS failed to initialize');
+    }
+  }
+}
+
+function decodeJPEGLS(imageFrame, pixelData) {
+  initializeJPEGLS();
+
+  var image = jpegLSDecode(pixelData, imageFrame.pixelRepresentation === 1);
+
+  // throw error if not success or too much data
+  if (image.result !== 0 && image.result !== 6) {
+    throw new Error('JPEG-LS decoder failed to decode frame (error code ' + image.result + ')');
+  }
+
+  imageFrame.columns = image.width;
+  imageFrame.rows = image.height;
+  imageFrame.pixelData = image.pixelData;
+
+  return imageFrame;
+}
+
+exports.default = decodeJPEGLS;
+exports.initializeJPEGLS = initializeJPEGLS;
+
+/***/ }),
+/* 6 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+function decodeJpx(imageFrame, pixelData) {
+  var jpxImage = new JpxImage();
+
+  jpxImage.parse(pixelData);
+
+  var tileCount = jpxImage.tiles.length;
+
+  if (tileCount !== 1) {
+    throw new Error('JPEG2000 decoder returned a tileCount of ' + tileCount + ', when 1 is expected');
+  }
+
+  imageFrame.columns = jpxImage.width;
+  imageFrame.rows = jpxImage.height;
+  imageFrame.pixelData = jpxImage.tiles[0].items;
+
+  return imageFrame;
+}
+
+var openJPEG = void 0;
+
+function decodeOpenJPEG(data, bytesPerPixel, signed) {
+  var dataPtr = openJPEG._malloc(data.length);
+
+  openJPEG.writeArrayToMemory(data, dataPtr);
+
+  // create param outpout
+  var imagePtrPtr = openJPEG._malloc(4);
+  var imageSizePtr = openJPEG._malloc(4);
+  var imageSizeXPtr = openJPEG._malloc(4);
+  var imageSizeYPtr = openJPEG._malloc(4);
+  var imageSizeCompPtr = openJPEG._malloc(4);
+
+  var t0 = new Date().getTime();
+  var ret = openJPEG.ccall('jp2_decode', 'number', ['number', 'number', 'number', 'number', 'number', 'number', 'number'], [dataPtr, data.length, imagePtrPtr, imageSizePtr, imageSizeXPtr, imageSizeYPtr, imageSizeCompPtr]);
+  // add num vomp..etc
+
+  if (ret !== 0) {
+    console.log('[opj_decode] decoding failed!');
+    openJPEG._free(dataPtr);
+    openJPEG._free(openJPEG.getValue(imagePtrPtr, '*'));
+    openJPEG._free(imageSizeXPtr);
+    openJPEG._free(imageSizeYPtr);
+    openJPEG._free(imageSizePtr);
+    openJPEG._free(imageSizeCompPtr);
+
+    return;
+  }
+
+  var imagePtr = openJPEG.getValue(imagePtrPtr, '*');
+
+  var image = {
+    length: openJPEG.getValue(imageSizePtr, 'i32'),
+    sx: openJPEG.getValue(imageSizeXPtr, 'i32'),
+    sy: openJPEG.getValue(imageSizeYPtr, 'i32'),
+    nbChannels: openJPEG.getValue(imageSizeCompPtr, 'i32'), // hard coded for now
+    perf_timetodecode: undefined,
+    pixelData: undefined
+  };
+
+  // Copy the data from the EMSCRIPTEN heap into the correct type array
+  var length = image.sx * image.sy * image.nbChannels;
+  var src32 = new Int32Array(openJPEG.HEAP32.buffer, imagePtr, length);
+
+  if (bytesPerPixel === 1) {
+    if (Uint8Array.from) {
+      image.pixelData = Uint8Array.from(src32);
+    } else {
+      image.pixelData = new Uint8Array(length);
+      for (var i = 0; i < length; i++) {
+        image.pixelData[i] = src32[i];
+      }
+    }
+  } else if (signed) {
+    if (Int16Array.from) {
+      image.pixelData = Int16Array.from(src32);
+    } else {
+      image.pixelData = new Int16Array(length);
+      for (var _i = 0; _i < length; _i++) {
+        image.pixelData[_i] = src32[_i];
+      }
+    }
+  } else if (Uint16Array.from) {
+    image.pixelData = Uint16Array.from(src32);
+  } else {
+    image.pixelData = new Uint16Array(length);
+    for (var _i2 = 0; _i2 < length; _i2++) {
+      image.pixelData[_i2] = src32[_i2];
+    }
+  }
+
+  var t1 = new Date().getTime();
+
+  image.perf_timetodecode = t1 - t0;
+
+  // free
+  openJPEG._free(dataPtr);
+  openJPEG._free(imagePtrPtr);
+  openJPEG._free(imagePtr);
+  openJPEG._free(imageSizePtr);
+  openJPEG._free(imageSizeXPtr);
+  openJPEG._free(imageSizeYPtr);
+  openJPEG._free(imageSizeCompPtr);
+
+  return image;
+}
+
+function decodeOpenJpeg2000(imageFrame, pixelData) {
+  var bytesPerPixel = imageFrame.bitsAllocated <= 8 ? 1 : 2;
+  var signed = imageFrame.pixelRepresentation === 1;
+
+  var image = decodeOpenJPEG(pixelData, bytesPerPixel, signed);
+
+  imageFrame.columns = image.sx;
+  imageFrame.rows = image.sy;
+  imageFrame.pixelData = image.pixelData;
+  if (image.nbChannels > 1) {
+    imageFrame.photometricInterpretation = 'RGB';
+  }
+
+  return imageFrame;
+}
+
+function initializeJPEG2000(decodeConfig) {
+  // check to make sure codec is loaded
+  if (!decodeConfig.usePDFJS) {
+    if (typeof OpenJPEG === 'undefined') {
+      throw new Error('OpenJPEG decoder not loaded');
+    }
+  }
+
+  if (!openJPEG) {
+    openJPEG = OpenJPEG();
+    if (!openJPEG || !openJPEG._jp2_decode) {
+      throw new Error('OpenJPEG failed to initialize');
+    }
+  }
+}
+
+function decodeJPEG2000(imageFrame, pixelData, decodeConfig) {
+  var options = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : {};
+
+  initializeJPEG2000(decodeConfig);
+
+  if (options.usePDFJS || decodeConfig.usePDFJS) {
+    // OHIF image-JPEG2000 https://github.com/OHIF/image-JPEG2000
+    // console.log('PDFJS')
+    return decodeJpx(imageFrame, pixelData);
+  }
+
+  // OpenJPEG2000 https://github.com/jpambrun/openjpeg
+  // console.log('OpenJPEG')
+  return decodeOpenJpeg2000(imageFrame, pixelData);
+}
+
+exports.default = decodeJPEG2000;
+exports.initializeJPEG2000 = initializeJPEG2000;
+
+/***/ }),
+/* 7 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
 function parseImageId(imageId) {
   // build a url by parsing out the url scheme and frame index from the imageId
   var firstColonIndex = imageId.indexOf(':');
@@ -252,7 +562,7 @@ function parseImageId(imageId) {
 exports.default = parseImageId;
 
 /***/ }),
-/* 5 */
+/* 8 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -289,37 +599,7 @@ exports.default = {
 };
 
 /***/ }),
-/* 6 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.setOptions = setOptions;
-exports.getOptions = getOptions;
-var options = {
-  // callback allowing customization of the xhr (e.g. adding custom auth headers, cors, etc)
-  beforeSend: function beforeSend() /* xhr, imageId */{},
-
-  // callback allowing modification of newly created image objects
-  imageCreated: function imageCreated() /* image */{},
-
-  strict: false
-};
-
-function setOptions(newOptions) {
-  options = newOptions;
-}
-
-function getOptions() {
-  return options;
-}
-
-/***/ }),
-/* 7 */
+/* 9 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -331,19 +611,19 @@ Object.defineProperty(exports, "__esModule", {
 
 var _externalModules = __webpack_require__(0);
 
-var _getImageFrame = __webpack_require__(24);
+var _getImageFrame = __webpack_require__(32);
 
 var _getImageFrame2 = _interopRequireDefault(_getImageFrame);
 
-var _decodeImageFrame = __webpack_require__(25);
+var _decodeImageFrame = __webpack_require__(33);
 
 var _decodeImageFrame2 = _interopRequireDefault(_decodeImageFrame);
 
-var _isColorImage = __webpack_require__(28);
+var _isColorImage = __webpack_require__(36);
 
 var _isColorImage2 = _interopRequireDefault(_isColorImage);
 
-var _convertColorSpace = __webpack_require__(29);
+var _convertColorSpace = __webpack_require__(37);
 
 var _convertColorSpace2 = _interopRequireDefault(_convertColorSpace);
 
@@ -351,7 +631,7 @@ var _getMinMax = __webpack_require__(2);
 
 var _getMinMax2 = _interopRequireDefault(_getMinMax);
 
-var _isJPEGBaseline8BitColor = __webpack_require__(30);
+var _isJPEGBaseline8BitColor = __webpack_require__(38);
 
 var _isJPEGBaseline8BitColor2 = _interopRequireDefault(_isJPEGBaseline8BitColor);
 
@@ -546,7 +826,462 @@ function createImage(imageId, pixelData, transferSyntax, options) {
 exports.default = createImage;
 
 /***/ }),
-/* 8 */
+/* 10 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var _decodeLittleEndian = __webpack_require__(11);
+
+var _decodeLittleEndian2 = _interopRequireDefault(_decodeLittleEndian);
+
+var _decodeBigEndian = __webpack_require__(12);
+
+var _decodeBigEndian2 = _interopRequireDefault(_decodeBigEndian);
+
+var _decodeRLE = __webpack_require__(13);
+
+var _decodeRLE2 = _interopRequireDefault(_decodeRLE);
+
+var _decodeJPEGBaseline = __webpack_require__(14);
+
+var _decodeJPEGBaseline2 = _interopRequireDefault(_decodeJPEGBaseline);
+
+var _decodeJPEGLossless = __webpack_require__(15);
+
+var _decodeJPEGLossless2 = _interopRequireDefault(_decodeJPEGLossless);
+
+var _decodeJPEGLS = __webpack_require__(5);
+
+var _decodeJPEGLS2 = _interopRequireDefault(_decodeJPEGLS);
+
+var _decodeJPEG = __webpack_require__(6);
+
+var _decodeJPEG2 = _interopRequireDefault(_decodeJPEG);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function decodeImageFrame(imageFrame, transferSyntax, pixelData, decodeConfig, options) {
+  var start = new Date().getTime();
+
+  if (transferSyntax === '1.2.840.10008.1.2') {
+    // Implicit VR Little Endian
+    imageFrame = (0, _decodeLittleEndian2.default)(imageFrame, pixelData);
+  } else if (transferSyntax === '1.2.840.10008.1.2.1') {
+    // Explicit VR Little Endian
+    imageFrame = (0, _decodeLittleEndian2.default)(imageFrame, pixelData);
+  } else if (transferSyntax === '1.2.840.10008.1.2.2') {
+    // Explicit VR Big Endian (retired)
+    imageFrame = (0, _decodeBigEndian2.default)(imageFrame, pixelData);
+  } else if (transferSyntax === '1.2.840.10008.1.2.1.99') {
+    // Deflate transfer syntax (deflated by dicomParser)
+    imageFrame = (0, _decodeLittleEndian2.default)(imageFrame, pixelData);
+  } else if (transferSyntax === '1.2.840.10008.1.2.5') {
+    // RLE Lossless
+    imageFrame = (0, _decodeRLE2.default)(imageFrame, pixelData);
+  } else if (transferSyntax === '1.2.840.10008.1.2.4.50') {
+    // JPEG Baseline lossy process 1 (8 bit)
+    imageFrame = (0, _decodeJPEGBaseline2.default)(imageFrame, pixelData);
+  } else if (transferSyntax === '1.2.840.10008.1.2.4.51') {
+    // JPEG Baseline lossy process 2 & 4 (12 bit)
+    imageFrame = (0, _decodeJPEGBaseline2.default)(imageFrame, pixelData);
+  } else if (transferSyntax === '1.2.840.10008.1.2.4.57') {
+    // JPEG Lossless, Nonhierarchical (Processes 14)
+    imageFrame = (0, _decodeJPEGLossless2.default)(imageFrame, pixelData);
+  } else if (transferSyntax === '1.2.840.10008.1.2.4.70') {
+    // JPEG Lossless, Nonhierarchical (Processes 14 [Selection 1])
+    imageFrame = (0, _decodeJPEGLossless2.default)(imageFrame, pixelData);
+  } else if (transferSyntax === '1.2.840.10008.1.2.4.80') {
+    // JPEG-LS Lossless Image Compression
+    imageFrame = (0, _decodeJPEGLS2.default)(imageFrame, pixelData);
+  } else if (transferSyntax === '1.2.840.10008.1.2.4.81') {
+    // JPEG-LS Lossy (Near-Lossless) Image Compression
+    imageFrame = (0, _decodeJPEGLS2.default)(imageFrame, pixelData);
+  } else if (transferSyntax === '1.2.840.10008.1.2.4.90') {
+    // JPEG 2000 Lossless
+    imageFrame = (0, _decodeJPEG2.default)(imageFrame, pixelData, decodeConfig, options);
+  } else if (transferSyntax === '1.2.840.10008.1.2.4.91') {
+    // JPEG 2000 Lossy
+    imageFrame = (0, _decodeJPEG2.default)(imageFrame, pixelData, decodeConfig, options);
+  } else {
+    throw new Error('no decoder for transfer syntax ' + transferSyntax);
+  }
+
+  /* Don't know if these work...
+   // JPEG 2000 Part 2 Multicomponent Image Compression (Lossless Only)
+   else if(transferSyntax === "1.2.840.10008.1.2.4.92")
+   {
+   return decodeJPEG2000(dataSet, frame);
+   }
+   // JPEG 2000 Part 2 Multicomponent Image Compression
+   else if(transferSyntax === "1.2.840.10008.1.2.4.93")
+   {
+   return decodeJPEG2000(dataSet, frame);
+   }
+   */
+
+  var end = new Date().getTime();
+
+  imageFrame.decodeTimeInMS = end - start;
+
+  return imageFrame;
+}
+
+exports.default = decodeImageFrame;
+
+/***/ }),
+/* 11 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+function decodeLittleEndian(imageFrame, pixelData) {
+  var arrayBuffer = pixelData.buffer;
+  var offset = pixelData.byteOffset;
+  var length = pixelData.length;
+
+  if (imageFrame.bitsAllocated === 16) {
+    // if pixel data is not aligned on even boundary, shift it so we can create the 16 bit array
+    // buffers on it
+    if (offset % 2) {
+      arrayBuffer = arrayBuffer.slice(offset);
+      offset = 0;
+    }
+
+    if (imageFrame.pixelRepresentation === 0) {
+      imageFrame.pixelData = new Uint16Array(arrayBuffer, offset, length / 2);
+    } else {
+      imageFrame.pixelData = new Int16Array(arrayBuffer, offset, length / 2);
+    }
+  } else if (imageFrame.bitsAllocated === 8 || imageFrame.bitsAllocated === 1) {
+    imageFrame.pixelData = pixelData;
+  } else if (imageFrame.bitsAllocated === 32) {
+    // if pixel data is not aligned on even boundary, shift it
+    if (offset % 2) {
+      arrayBuffer = arrayBuffer.slice(offset);
+      offset = 0;
+    }
+
+    imageFrame.pixelData = new Float32Array(arrayBuffer, offset, length / 4);
+  }
+
+  return imageFrame;
+}
+
+exports.default = decodeLittleEndian;
+
+/***/ }),
+/* 12 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+/* eslint no-bitwise: 0 */
+function swap16(val) {
+  return (val & 0xFF) << 8 | val >> 8 & 0xFF;
+}
+
+function decodeBigEndian(imageFrame, pixelData) {
+  if (imageFrame.bitsAllocated === 16) {
+    var arrayBuffer = pixelData.buffer;
+    var offset = pixelData.byteOffset;
+    var length = pixelData.length;
+    // if pixel data is not aligned on even boundary, shift it so we can create the 16 bit array
+    // buffers on it
+
+    if (offset % 2) {
+      arrayBuffer = arrayBuffer.slice(offset);
+      offset = 0;
+    }
+
+    if (imageFrame.pixelRepresentation === 0) {
+      imageFrame.pixelData = new Uint16Array(arrayBuffer, offset, length / 2);
+    } else {
+      imageFrame.pixelData = new Int16Array(arrayBuffer, offset, length / 2);
+    }
+    // Do the byte swap
+    for (var i = 0; i < imageFrame.pixelData.length; i++) {
+      imageFrame.pixelData[i] = swap16(imageFrame.pixelData[i]);
+    }
+  } else if (imageFrame.bitsAllocated === 8) {
+    imageFrame.pixelData = pixelData;
+  }
+
+  return imageFrame;
+}
+
+exports.default = decodeBigEndian;
+
+/***/ }),
+/* 13 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+function decodeRLE(imageFrame, pixelData) {
+  if (imageFrame.bitsAllocated === 8) {
+    if (imageFrame.planarConfiguration) {
+      return decode8Planar(imageFrame, pixelData);
+    }
+
+    return decode8(imageFrame, pixelData);
+  } else if (imageFrame.bitsAllocated === 16) {
+    return decode16(imageFrame, pixelData);
+  }
+
+  throw new Error('unsupported pixel format for RLE');
+}
+
+function decode8(imageFrame, pixelData) {
+  var frameData = pixelData;
+  var frameSize = imageFrame.rows * imageFrame.columns;
+  var outFrame = new ArrayBuffer(frameSize * imageFrame.samplesPerPixel);
+  var header = new DataView(frameData.buffer, frameData.byteOffset);
+  var data = new Int8Array(frameData.buffer, frameData.byteOffset);
+  var out = new Int8Array(outFrame);
+
+  var outIndex = 0;
+  var numSegments = header.getInt32(0, true);
+
+  for (var s = 0; s < numSegments; ++s) {
+    outIndex = s;
+
+    var inIndex = header.getInt32((s + 1) * 4, true);
+    var maxIndex = header.getInt32((s + 2) * 4, true);
+
+    if (maxIndex === 0) {
+      maxIndex = frameData.length;
+    }
+
+    var endOfSegment = frameSize * numSegments;
+
+    while (inIndex < maxIndex) {
+      var n = data[inIndex++];
+
+      if (n >= 0 && n <= 127) {
+        // copy n bytes
+        for (var i = 0; i < n + 1 && outIndex < endOfSegment; ++i) {
+          out[outIndex] = data[inIndex++];
+          outIndex += imageFrame.samplesPerPixel;
+        }
+      } else if (n <= -1 && n >= -127) {
+        var value = data[inIndex++];
+        // run of n bytes
+
+        for (var j = 0; j < -n + 1 && outIndex < endOfSegment; ++j) {
+          out[outIndex] = value;
+          outIndex += imageFrame.samplesPerPixel;
+        }
+      } /* else if (n === -128) {
+        } // do nothing */
+    }
+  }
+  imageFrame.pixelData = new Uint8Array(outFrame);
+
+  return imageFrame;
+}
+
+function decode8Planar(imageFrame, pixelData) {
+  var frameData = pixelData;
+  var frameSize = imageFrame.rows * imageFrame.columns;
+  var outFrame = new ArrayBuffer(frameSize * imageFrame.samplesPerPixel);
+  var header = new DataView(frameData.buffer, frameData.byteOffset);
+  var data = new Int8Array(frameData.buffer, frameData.byteOffset);
+  var out = new Int8Array(outFrame);
+
+  var outIndex = 0;
+  var numSegments = header.getInt32(0, true);
+
+  for (var s = 0; s < numSegments; ++s) {
+    outIndex = s * frameSize;
+
+    var inIndex = header.getInt32((s + 1) * 4, true);
+    var maxIndex = header.getInt32((s + 2) * 4, true);
+
+    if (maxIndex === 0) {
+      maxIndex = frameData.length;
+    }
+
+    var endOfSegment = frameSize * numSegments;
+
+    while (inIndex < maxIndex) {
+      var n = data[inIndex++];
+
+      if (n >= 0 && n <= 127) {
+        // copy n bytes
+        for (var i = 0; i < n + 1 && outIndex < endOfSegment; ++i) {
+          out[outIndex] = data[inIndex++];
+          outIndex++;
+        }
+      } else if (n <= -1 && n >= -127) {
+        var value = data[inIndex++];
+        // run of n bytes
+
+        for (var j = 0; j < -n + 1 && outIndex < endOfSegment; ++j) {
+          out[outIndex] = value;
+          outIndex++;
+        }
+      } /* else if (n === -128) {
+        } // do nothing */
+    }
+  }
+  imageFrame.pixelData = new Uint8Array(outFrame);
+
+  return imageFrame;
+}
+
+function decode16(imageFrame, pixelData) {
+  var frameData = pixelData;
+  var frameSize = imageFrame.rows * imageFrame.columns;
+  var outFrame = new ArrayBuffer(frameSize * imageFrame.samplesPerPixel * 2);
+
+  var header = new DataView(frameData.buffer, frameData.byteOffset);
+  var data = new Int8Array(frameData.buffer, frameData.byteOffset);
+  var out = new Int8Array(outFrame);
+
+  var numSegments = header.getInt32(0, true);
+
+  for (var s = 0; s < numSegments; ++s) {
+    var outIndex = 0;
+    var highByte = s === 0 ? 1 : 0;
+
+    var inIndex = header.getInt32((s + 1) * 4, true);
+    var maxIndex = header.getInt32((s + 2) * 4, true);
+
+    if (maxIndex === 0) {
+      maxIndex = frameData.length;
+    }
+
+    while (inIndex < maxIndex) {
+      var n = data[inIndex++];
+
+      if (n >= 0 && n <= 127) {
+        for (var i = 0; i < n + 1 && outIndex < frameSize; ++i) {
+          out[outIndex * 2 + highByte] = data[inIndex++];
+          outIndex++;
+        }
+      } else if (n <= -1 && n >= -127) {
+        var value = data[inIndex++];
+
+        for (var j = 0; j < -n + 1 && outIndex < frameSize; ++j) {
+          out[outIndex * 2 + highByte] = value;
+          outIndex++;
+        }
+      } /* else if (n === -128) {
+        } // do nothing */
+    }
+  }
+  if (imageFrame.pixelRepresentation === 0) {
+    imageFrame.pixelData = new Uint16Array(outFrame);
+  } else {
+    imageFrame.pixelData = new Int16Array(outFrame);
+  }
+
+  return imageFrame;
+}
+
+exports.default = decodeRLE;
+
+/***/ }),
+/* 14 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+
+function decodeJPEGBaseline(imageFrame, pixelData) {
+  // check to make sure codec is loaded
+  if (typeof JpegImage === 'undefined') {
+    throw new Error('No JPEG Baseline decoder loaded');
+  }
+  var jpeg = new JpegImage();
+
+  jpeg.parse(pixelData);
+
+  // Do not use the internal jpeg.js color transformation,
+  // since we will handle this afterwards
+  jpeg.colorTransform = false;
+
+  if (imageFrame.bitsAllocated === 8) {
+    imageFrame.pixelData = jpeg.getData(imageFrame.columns, imageFrame.rows);
+
+    return imageFrame;
+  } else if (imageFrame.bitsAllocated === 16) {
+    imageFrame.pixelData = jpeg.getData16(imageFrame.columns, imageFrame.rows);
+
+    return imageFrame;
+  }
+}
+
+exports.default = decodeJPEGBaseline;
+
+/***/ }),
+/* 15 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+
+function decodeJPEGLossless(imageFrame, pixelData) {
+  // check to make sure codec is loaded
+  if (typeof jpeg === 'undefined' || typeof jpeg.lossless === 'undefined' || typeof jpeg.lossless.Decoder === 'undefined') {
+    throw new Error('No JPEG Lossless decoder loaded');
+  }
+
+  var byteOutput = imageFrame.bitsAllocated <= 8 ? 1 : 2;
+  // console.time('jpeglossless');
+  var buffer = pixelData.buffer;
+  var decoder = new jpeg.lossless.Decoder();
+  var decompressedData = decoder.decode(buffer, pixelData.byteOffset, pixelData.length, byteOutput);
+  // console.timeEnd('jpeglossless');
+
+  if (imageFrame.pixelRepresentation === 0) {
+    if (imageFrame.bitsAllocated === 16) {
+      imageFrame.pixelData = new Uint16Array(decompressedData.buffer);
+
+      return imageFrame;
+    }
+    // untested!
+    imageFrame.pixelData = new Uint8Array(decompressedData.buffer);
+
+    return imageFrame;
+  }
+  imageFrame.pixelData = new Int16Array(decompressedData.buffer);
+
+  return imageFrame;
+}
+
+exports.default = decodeJPEGLossless;
+
+/***/ }),
+/* 16 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -663,7 +1398,7 @@ exports.default = {
 };
 
 /***/ }),
-/* 9 */
+/* 17 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -675,7 +1410,7 @@ Object.defineProperty(exports, "__esModule", {
 exports.default = '2.0.0';
 
 /***/ }),
-/* 10 */
+/* 18 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -685,7 +1420,7 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-var _convertRGBColorByPixel = __webpack_require__(40);
+var _convertRGBColorByPixel = __webpack_require__(46);
 
 Object.defineProperty(exports, 'convertRGBColorByPixel', {
   enumerable: true,
@@ -694,7 +1429,7 @@ Object.defineProperty(exports, 'convertRGBColorByPixel', {
   }
 });
 
-var _convertRGBColorByPlane = __webpack_require__(41);
+var _convertRGBColorByPlane = __webpack_require__(47);
 
 Object.defineProperty(exports, 'convertRGBColorByPlane', {
   enumerable: true,
@@ -703,7 +1438,7 @@ Object.defineProperty(exports, 'convertRGBColorByPlane', {
   }
 });
 
-var _convertYBRFullByPixel = __webpack_require__(42);
+var _convertYBRFullByPixel = __webpack_require__(48);
 
 Object.defineProperty(exports, 'convertYBRFullByPixel', {
   enumerable: true,
@@ -712,7 +1447,7 @@ Object.defineProperty(exports, 'convertYBRFullByPixel', {
   }
 });
 
-var _convertYBRFullByPlane = __webpack_require__(43);
+var _convertYBRFullByPlane = __webpack_require__(49);
 
 Object.defineProperty(exports, 'convertYBRFullByPlane', {
   enumerable: true,
@@ -721,7 +1456,7 @@ Object.defineProperty(exports, 'convertYBRFullByPlane', {
   }
 });
 
-var _convertPALETTECOLOR = __webpack_require__(44);
+var _convertPALETTECOLOR = __webpack_require__(50);
 
 Object.defineProperty(exports, 'convertPALETTECOLOR', {
   enumerable: true,
@@ -733,7 +1468,7 @@ Object.defineProperty(exports, 'convertPALETTECOLOR', {
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 /***/ }),
-/* 11 */
+/* 19 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -743,39 +1478,39 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-var _index = __webpack_require__(12);
+var _index = __webpack_require__(20);
 
-var _dataSetCacheManager = __webpack_require__(8);
+var _dataSetCacheManager = __webpack_require__(16);
 
 var _dataSetCacheManager2 = _interopRequireDefault(_dataSetCacheManager);
 
-var _fileManager = __webpack_require__(31);
+var _fileManager = __webpack_require__(39);
 
 var _fileManager2 = _interopRequireDefault(_fileManager);
 
-var _getEncapsulatedImageFrame = __webpack_require__(32);
+var _getEncapsulatedImageFrame = __webpack_require__(40);
 
 var _getEncapsulatedImageFrame2 = _interopRequireDefault(_getEncapsulatedImageFrame);
 
-var _getUncompressedImageFrame = __webpack_require__(33);
+var _getUncompressedImageFrame = __webpack_require__(41);
 
 var _getUncompressedImageFrame2 = _interopRequireDefault(_getUncompressedImageFrame);
 
-var _loadFileRequest = __webpack_require__(35);
+var _loadFileRequest = __webpack_require__(43);
 
 var _loadFileRequest2 = _interopRequireDefault(_loadFileRequest);
 
-var _loadImage = __webpack_require__(36);
+var _loadImage = __webpack_require__(44);
 
-var _parseImageId = __webpack_require__(4);
+var _parseImageId = __webpack_require__(7);
 
 var _parseImageId2 = _interopRequireDefault(_parseImageId);
 
-var _unpackBinaryFrame = __webpack_require__(34);
+var _unpackBinaryFrame = __webpack_require__(42);
 
 var _unpackBinaryFrame2 = _interopRequireDefault(_unpackBinaryFrame);
 
-var _register = __webpack_require__(53);
+var _register = __webpack_require__(59);
 
 var _register2 = _interopRequireDefault(_register);
 
@@ -805,7 +1540,7 @@ exports.default = {
 };
 
 /***/ }),
-/* 12 */
+/* 20 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -815,7 +1550,7 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-var _getImagePixelModule = __webpack_require__(13);
+var _getImagePixelModule = __webpack_require__(21);
 
 Object.defineProperty(exports, 'getImagePixelModule', {
   enumerable: true,
@@ -824,7 +1559,7 @@ Object.defineProperty(exports, 'getImagePixelModule', {
   }
 });
 
-var _getLUTs = __webpack_require__(14);
+var _getLUTs = __webpack_require__(22);
 
 Object.defineProperty(exports, 'getLUTs', {
   enumerable: true,
@@ -833,7 +1568,7 @@ Object.defineProperty(exports, 'getLUTs', {
   }
 });
 
-var _getModalityLUTOutputPixelRepresentation = __webpack_require__(15);
+var _getModalityLUTOutputPixelRepresentation = __webpack_require__(23);
 
 Object.defineProperty(exports, 'getModalityLUTOutputPixelRepresentation', {
   enumerable: true,
@@ -842,7 +1577,7 @@ Object.defineProperty(exports, 'getModalityLUTOutputPixelRepresentation', {
   }
 });
 
-var _getNumberValues = __webpack_require__(16);
+var _getNumberValues = __webpack_require__(24);
 
 Object.defineProperty(exports, 'getNumberValues', {
   enumerable: true,
@@ -851,7 +1586,7 @@ Object.defineProperty(exports, 'getNumberValues', {
   }
 });
 
-var _metaDataProvider = __webpack_require__(45);
+var _metaDataProvider = __webpack_require__(51);
 
 Object.defineProperty(exports, 'metaDataProvider', {
   enumerable: true,
@@ -863,7 +1598,7 @@ Object.defineProperty(exports, 'metaDataProvider', {
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 /***/ }),
-/* 13 */
+/* 21 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -972,7 +1707,7 @@ function getImagePixelModule(dataSet) {
 exports.default = getImagePixelModule;
 
 /***/ }),
-/* 14 */
+/* 22 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -1036,7 +1771,7 @@ function getLUTs(pixelRepresentation, lutSequence) {
 exports.default = getLUTs;
 
 /***/ }),
-/* 15 */
+/* 23 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -1096,7 +1831,7 @@ function getModalityLUTOutputPixelRepresentation(dataSet) {
 exports.default = getModalityLUTOutputPixelRepresentation;
 
 /***/ }),
-/* 16 */
+/* 24 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -1127,7 +1862,7 @@ function getNumberValues(dataSet, tag, minimumLength) {
 exports.default = getNumberValues;
 
 /***/ }),
-/* 17 */
+/* 25 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -1137,25 +1872,25 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-var _index = __webpack_require__(18);
+var _index = __webpack_require__(26);
 
-var _findIndexOfString = __webpack_require__(21);
+var _findIndexOfString = __webpack_require__(29);
 
 var _findIndexOfString2 = _interopRequireDefault(_findIndexOfString);
 
-var _getPixelData = __webpack_require__(22);
+var _getPixelData = __webpack_require__(30);
 
 var _getPixelData2 = _interopRequireDefault(_getPixelData);
 
-var _metaDataManager = __webpack_require__(5);
+var _metaDataManager = __webpack_require__(8);
 
 var _metaDataManager2 = _interopRequireDefault(_metaDataManager);
 
-var _loadImage = __webpack_require__(23);
+var _loadImage = __webpack_require__(31);
 
 var _loadImage2 = _interopRequireDefault(_loadImage);
 
-var _register = __webpack_require__(51);
+var _register = __webpack_require__(57);
 
 var _register2 = _interopRequireDefault(_register);
 
@@ -1179,7 +1914,7 @@ exports.default = {
 };
 
 /***/ }),
-/* 18 */
+/* 26 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -1189,7 +1924,7 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-var _getNumberString = __webpack_require__(48);
+var _getNumberString = __webpack_require__(54);
 
 Object.defineProperty(exports, 'getNumberString', {
   enumerable: true,
@@ -1198,7 +1933,7 @@ Object.defineProperty(exports, 'getNumberString', {
   }
 });
 
-var _getNumberValue = __webpack_require__(19);
+var _getNumberValue = __webpack_require__(27);
 
 Object.defineProperty(exports, 'getNumberValue', {
   enumerable: true,
@@ -1207,7 +1942,7 @@ Object.defineProperty(exports, 'getNumberValue', {
   }
 });
 
-var _getNumberValues = __webpack_require__(20);
+var _getNumberValues = __webpack_require__(28);
 
 Object.defineProperty(exports, 'getNumberValues', {
   enumerable: true,
@@ -1225,7 +1960,7 @@ Object.defineProperty(exports, 'getValue', {
   }
 });
 
-var _metaDataProvider = __webpack_require__(49);
+var _metaDataProvider = __webpack_require__(55);
 
 Object.defineProperty(exports, 'metaDataProvider', {
   enumerable: true,
@@ -1237,7 +1972,7 @@ Object.defineProperty(exports, 'metaDataProvider', {
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 /***/ }),
-/* 19 */
+/* 27 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -1266,7 +2001,7 @@ function getNumberValue(element, index) {
 exports.default = getNumberValue;
 
 /***/ }),
-/* 20 */
+/* 28 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -1309,7 +2044,7 @@ function getNumberValues(element, minimumLength) {
 exports.default = getNumberValues;
 
 /***/ }),
-/* 21 */
+/* 29 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -1365,7 +2100,7 @@ function findIndexOfString(data, str, offset) {
 exports.default = findIndexOfString;
 
 /***/ }),
-/* 22 */
+/* 30 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -1377,7 +2112,7 @@ Object.defineProperty(exports, "__esModule", {
 
 var _index = __webpack_require__(1);
 
-var _findIndexOfString = __webpack_require__(21);
+var _findIndexOfString = __webpack_require__(29);
 
 var _findIndexOfString2 = _interopRequireDefault(_findIndexOfString);
 
@@ -1466,7 +2201,7 @@ function getPixelData(uri, imageId) {
 exports.default = getPixelData;
 
 /***/ }),
-/* 23 */
+/* 31 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -1476,15 +2211,15 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-var _metaDataManager = __webpack_require__(5);
+var _metaDataManager = __webpack_require__(8);
 
 var _metaDataManager2 = _interopRequireDefault(_metaDataManager);
 
-var _getPixelData = __webpack_require__(22);
+var _getPixelData = __webpack_require__(30);
 
 var _getPixelData2 = _interopRequireDefault(_getPixelData);
 
-var _createImage = __webpack_require__(7);
+var _createImage = __webpack_require__(9);
 
 var _createImage2 = _interopRequireDefault(_createImage);
 
@@ -1536,7 +2271,7 @@ function loadImage(imageId, options) {
 exports.default = loadImage;
 
 /***/ }),
-/* 24 */
+/* 32 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -1574,7 +2309,7 @@ function getImageFrame(imageId) {
 exports.default = getImageFrame;
 
 /***/ }),
-/* 25 */
+/* 33 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -1584,19 +2319,40 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-var _webWorkerManager = __webpack_require__(26);
+var _options = __webpack_require__(4);
+
+var _webWorkerManager = __webpack_require__(34);
 
 var _webWorkerManager2 = _interopRequireDefault(_webWorkerManager);
 
-var _decodeJPEGBaseline8BitColor = __webpack_require__(27);
+var _decodeJPEGBaseline8BitColor = __webpack_require__(35);
 
 var _decodeJPEGBaseline8BitColor2 = _interopRequireDefault(_decodeJPEGBaseline8BitColor);
 
+var _decodeImageFrame = __webpack_require__(10);
+
+var _decodeImageFrame2 = _interopRequireDefault(_decodeImageFrame);
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-function addDecodeTask(imageFrame, transferSyntax, pixelData, options) {
+function processDecodeTask(imageFrame, transferSyntax, pixelData, options) {
   var priority = options.priority || undefined;
   var transferList = options.transferPixelData ? [pixelData.buffer] : undefined;
+  var loaderOptions = (0, _options.getOptions)();
+  var decodeConfig = loaderOptions.decodeConfig;
+
+  if (decodeConfig.useWebWorkers === false) {
+    return new Promise(function (resolve, reject) {
+      try {
+        var decodeArguments = [imageFrame, transferSyntax, pixelData, decodeConfig, options];
+        var decodedImageFrame = _decodeImageFrame2.default.apply(undefined, decodeArguments);
+
+        resolve(decodedImageFrame);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
 
   return _webWorkerManager2.default.addTask('decodeTask', {
     imageFrame: imageFrame,
@@ -1612,19 +2368,19 @@ function decodeImageFrame(imageFrame, transferSyntax, pixelData, canvas) {
   // TODO: Turn this into a switch statement instead
   if (transferSyntax === '1.2.840.10008.1.2') {
     // Implicit VR Little Endian
-    return addDecodeTask(imageFrame, transferSyntax, pixelData, options);
+    return processDecodeTask(imageFrame, transferSyntax, pixelData, options);
   } else if (transferSyntax === '1.2.840.10008.1.2.1') {
     // Explicit VR Little Endian
-    return addDecodeTask(imageFrame, transferSyntax, pixelData, options);
+    return processDecodeTask(imageFrame, transferSyntax, pixelData, options);
   } else if (transferSyntax === '1.2.840.10008.1.2.2') {
     // Explicit VR Big Endian (retired)
-    return addDecodeTask(imageFrame, transferSyntax, pixelData, options);
+    return processDecodeTask(imageFrame, transferSyntax, pixelData, options);
   } else if (transferSyntax === '1.2.840.10008.1.2.1.99') {
     // Deflate transfer syntax (deflated by dicomParser)
-    return addDecodeTask(imageFrame, transferSyntax, pixelData, options);
+    return processDecodeTask(imageFrame, transferSyntax, pixelData, options);
   } else if (transferSyntax === '1.2.840.10008.1.2.5') {
     // RLE Lossless
-    return addDecodeTask(imageFrame, transferSyntax, pixelData, options);
+    return processDecodeTask(imageFrame, transferSyntax, pixelData, options);
   } else if (transferSyntax === '1.2.840.10008.1.2.4.50') {
     // JPEG Baseline lossy process 1 (8 bit)
 
@@ -1634,28 +2390,28 @@ function decodeImageFrame(imageFrame, transferSyntax, pixelData, canvas) {
       return (0, _decodeJPEGBaseline8BitColor2.default)(imageFrame, pixelData, canvas);
     }
 
-    return addDecodeTask(imageFrame, transferSyntax, pixelData, options);
+    return processDecodeTask(imageFrame, transferSyntax, pixelData, options);
   } else if (transferSyntax === '1.2.840.10008.1.2.4.51') {
     // JPEG Baseline lossy process 2 & 4 (12 bit)
-    return addDecodeTask(imageFrame, transferSyntax, pixelData, options);
+    return processDecodeTask(imageFrame, transferSyntax, pixelData, options);
   } else if (transferSyntax === '1.2.840.10008.1.2.4.57') {
     // JPEG Lossless, Nonhierarchical (Processes 14)
-    return addDecodeTask(imageFrame, transferSyntax, pixelData, options);
+    return processDecodeTask(imageFrame, transferSyntax, pixelData, options);
   } else if (transferSyntax === '1.2.840.10008.1.2.4.70') {
     // JPEG Lossless, Nonhierarchical (Processes 14 [Selection 1])
-    return addDecodeTask(imageFrame, transferSyntax, pixelData, options);
+    return processDecodeTask(imageFrame, transferSyntax, pixelData, options);
   } else if (transferSyntax === '1.2.840.10008.1.2.4.80') {
     // JPEG-LS Lossless Image Compression
-    return addDecodeTask(imageFrame, transferSyntax, pixelData, options);
+    return processDecodeTask(imageFrame, transferSyntax, pixelData, options);
   } else if (transferSyntax === '1.2.840.10008.1.2.4.81') {
     // JPEG-LS Lossy (Near-Lossless) Image Compression
-    return addDecodeTask(imageFrame, transferSyntax, pixelData, options);
+    return processDecodeTask(imageFrame, transferSyntax, pixelData, options);
   } else if (transferSyntax === '1.2.840.10008.1.2.4.90') {
     // JPEG 2000 Lossless
-    return addDecodeTask(imageFrame, transferSyntax, pixelData, options);
+    return processDecodeTask(imageFrame, transferSyntax, pixelData, options);
   } else if (transferSyntax === '1.2.840.10008.1.2.4.91') {
     // JPEG 2000 Lossy
-    return addDecodeTask(imageFrame, transferSyntax, pixelData, options);
+    return processDecodeTask(imageFrame, transferSyntax, pixelData, options);
   }
 
   /* Don't know if these work...
@@ -1677,7 +2433,7 @@ function decodeImageFrame(imageFrame, transferSyntax, pixelData, canvas) {
 exports.default = decodeImageFrame;
 
 /***/ }),
-/* 26 */
+/* 34 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -1687,7 +2443,7 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-var _options = __webpack_require__(6);
+var _options = __webpack_require__(4);
 
 // the taskId to assign to the next task added via addTask()
 var nextTaskId = 0;
@@ -1708,6 +2464,7 @@ var defaultConfig = {
   webWorkerTaskPaths: [],
   taskConfiguration: {
     decodeTask: {
+      useWebWorkers: true,
       loadCodecsOnStartup: true,
       initializeCodecsOnStartup: false,
       codecsPath: '../dist/cornerstoneWADOImageLoaderCodecs.js',
@@ -1838,13 +2595,18 @@ function initialize(configObject) {
   }
 
   config = configObject;
+  options.decodeConfig = (config.taskConfiguration || defaultConfig.taskConfiguration).decodeTask;
 
-  config.maxWebWorkers = config.maxWebWorkers || navigator.hardwareConcurrency || 1;
+  // Prevent web worker from being spawned if it's disabled by configuration
+  if (options.decodeConfig.useWebWorkers !== false) {
 
-  // Spawn new web workers
-  if (!config.startWebWorkersOnDemand) {
-    for (var i = 0; i < config.maxWebWorkers; i++) {
-      spawnWebWorker();
+    config.maxWebWorkers = config.maxWebWorkers || navigator.hardwareConcurrency || 1;
+
+    // Spawn new web workers
+    if (!config.startWebWorkersOnDemand) {
+      for (var i = 0; i < config.maxWebWorkers; i++) {
+        spawnWebWorker();
+      }
     }
   }
 }
@@ -2011,7 +2773,7 @@ exports.default = {
 };
 
 /***/ }),
-/* 27 */
+/* 35 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2109,7 +2871,7 @@ function decodeJPEGBaseline8BitColor(imageFrame, pixelData, canvas) {
 exports.default = decodeJPEGBaseline8BitColor;
 
 /***/ }),
-/* 28 */
+/* 36 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2124,7 +2886,7 @@ exports.default = function (photoMetricInterpretation) {
 };
 
 /***/ }),
-/* 29 */
+/* 37 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2135,7 +2897,7 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports.default = convertColorSpace;
 
-var _index = __webpack_require__(10);
+var _index = __webpack_require__(18);
 
 function convertRGB(imageFrame, rgbaBuffer) {
   if (imageFrame.planarConfiguration === 0) {
@@ -2175,7 +2937,7 @@ function convertColorSpace(imageFrame, imageData) {
 }
 
 /***/ }),
-/* 30 */
+/* 38 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2195,7 +2957,7 @@ function isJPEGBaseline8BitColor(imageFrame, transferSyntax) {
 exports.default = isJPEGBaseline8BitColor;
 
 /***/ }),
-/* 31 */
+/* 39 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2232,7 +2994,7 @@ exports.default = {
 };
 
 /***/ }),
-/* 32 */
+/* 40 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2274,7 +3036,7 @@ function getEncapsulatedImageFrame(dataSet, frameIndex) {
 }
 
 /***/ }),
-/* 33 */
+/* 41 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2284,7 +3046,7 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-var _unpackBinaryFrame = __webpack_require__(34);
+var _unpackBinaryFrame = __webpack_require__(42);
 
 var _unpackBinaryFrame2 = _interopRequireDefault(_unpackBinaryFrame);
 
@@ -2342,7 +3104,7 @@ function getUncompressedImageFrame(dataSet, frameIndex) {
 exports.default = getUncompressedImageFrame;
 
 /***/ }),
-/* 34 */
+/* 42 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2384,7 +3146,7 @@ function unpackBinaryFrame(byteArray, frameOffset, pixelsPerFrame) {
 exports.default = unpackBinaryFrame;
 
 /***/ }),
-/* 35 */
+/* 43 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2394,11 +3156,11 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-var _parseImageId = __webpack_require__(4);
+var _parseImageId = __webpack_require__(7);
 
 var _parseImageId2 = _interopRequireDefault(_parseImageId);
 
-var _fileManager = __webpack_require__(31);
+var _fileManager = __webpack_require__(39);
 
 var _fileManager2 = _interopRequireDefault(_fileManager);
 
@@ -2427,7 +3189,7 @@ function loadFileRequest(uri) {
 exports.default = loadFileRequest;
 
 /***/ }),
-/* 36 */
+/* 44 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2438,23 +3200,23 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports.loadImage = exports.getLoaderForScheme = exports.loadImageFromPromise = undefined;
 
-var _createImage = __webpack_require__(7);
+var _createImage = __webpack_require__(9);
 
 var _createImage2 = _interopRequireDefault(_createImage);
 
-var _parseImageId = __webpack_require__(4);
+var _parseImageId = __webpack_require__(7);
 
 var _parseImageId2 = _interopRequireDefault(_parseImageId);
 
-var _dataSetCacheManager = __webpack_require__(8);
+var _dataSetCacheManager = __webpack_require__(16);
 
 var _dataSetCacheManager2 = _interopRequireDefault(_dataSetCacheManager);
 
-var _loadFileRequest = __webpack_require__(35);
+var _loadFileRequest = __webpack_require__(43);
 
 var _loadFileRequest2 = _interopRequireDefault(_loadFileRequest);
 
-var _getPixelData = __webpack_require__(52);
+var _getPixelData = __webpack_require__(58);
 
 var _getPixelData2 = _interopRequireDefault(_getPixelData);
 
@@ -2566,9 +3328,7 @@ exports.getLoaderForScheme = getLoaderForScheme;
 exports.loadImage = loadImage;
 
 /***/ }),
-/* 37 */,
-/* 38 */,
-/* 39 */
+/* 45 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2578,7 +3338,7 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-var _index = __webpack_require__(10);
+var _index = __webpack_require__(18);
 
 Object.keys(_index).forEach(function (key) {
   if (key === "default" || key === "__esModule") return;
@@ -2590,7 +3350,7 @@ Object.keys(_index).forEach(function (key) {
   });
 });
 
-var _index2 = __webpack_require__(11);
+var _index2 = __webpack_require__(19);
 
 Object.defineProperty(exports, 'wadouri', {
   enumerable: true,
@@ -2599,7 +3359,7 @@ Object.defineProperty(exports, 'wadouri', {
   }
 });
 
-var _index3 = __webpack_require__(17);
+var _index3 = __webpack_require__(25);
 
 Object.defineProperty(exports, 'wadors', {
   enumerable: true,
@@ -2608,7 +3368,7 @@ Object.defineProperty(exports, 'wadors', {
   }
 });
 
-var _configure = __webpack_require__(54);
+var _configure = __webpack_require__(60);
 
 Object.defineProperty(exports, 'configure', {
   enumerable: true,
@@ -2617,7 +3377,7 @@ Object.defineProperty(exports, 'configure', {
   }
 });
 
-var _convertColorSpace = __webpack_require__(29);
+var _convertColorSpace = __webpack_require__(37);
 
 Object.defineProperty(exports, 'convertColorSpace', {
   enumerable: true,
@@ -2626,7 +3386,7 @@ Object.defineProperty(exports, 'convertColorSpace', {
   }
 });
 
-var _createImage = __webpack_require__(7);
+var _createImage = __webpack_require__(9);
 
 Object.defineProperty(exports, 'createImage', {
   enumerable: true,
@@ -2635,7 +3395,7 @@ Object.defineProperty(exports, 'createImage', {
   }
 });
 
-var _decodeImageFrame = __webpack_require__(25);
+var _decodeImageFrame = __webpack_require__(33);
 
 Object.defineProperty(exports, 'decodeImageFrame', {
   enumerable: true,
@@ -2644,7 +3404,7 @@ Object.defineProperty(exports, 'decodeImageFrame', {
   }
 });
 
-var _decodeJPEGBaseline8BitColor = __webpack_require__(27);
+var _decodeJPEGBaseline8BitColor = __webpack_require__(35);
 
 Object.defineProperty(exports, 'decodeJPEGBaseline8BitColor', {
   enumerable: true,
@@ -2653,7 +3413,7 @@ Object.defineProperty(exports, 'decodeJPEGBaseline8BitColor', {
   }
 });
 
-var _getImageFrame = __webpack_require__(24);
+var _getImageFrame = __webpack_require__(32);
 
 Object.defineProperty(exports, 'getImageFrame', {
   enumerable: true,
@@ -2671,7 +3431,7 @@ Object.defineProperty(exports, 'getMinMax', {
   }
 });
 
-var _isColorImage = __webpack_require__(28);
+var _isColorImage = __webpack_require__(36);
 
 Object.defineProperty(exports, 'isColorImage', {
   enumerable: true,
@@ -2680,7 +3440,7 @@ Object.defineProperty(exports, 'isColorImage', {
   }
 });
 
-var _isJPEGBaseline8BitColor = __webpack_require__(30);
+var _isJPEGBaseline8BitColor = __webpack_require__(38);
 
 Object.defineProperty(exports, 'isJPEGBaseline8BitColor', {
   enumerable: true,
@@ -2689,7 +3449,7 @@ Object.defineProperty(exports, 'isJPEGBaseline8BitColor', {
   }
 });
 
-var _webWorkerManager = __webpack_require__(26);
+var _webWorkerManager = __webpack_require__(34);
 
 Object.defineProperty(exports, 'webWorkerManager', {
   enumerable: true,
@@ -2698,7 +3458,7 @@ Object.defineProperty(exports, 'webWorkerManager', {
   }
 });
 
-var _version = __webpack_require__(9);
+var _version = __webpack_require__(17);
 
 Object.defineProperty(exports, 'version', {
   enumerable: true,
@@ -2728,7 +3488,7 @@ Object.defineProperty(exports, 'external', {
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 /***/ }),
-/* 40 */
+/* 46 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2759,7 +3519,7 @@ exports.default = function (imageFrame, rgbaBuffer) {
 };
 
 /***/ }),
-/* 41 */
+/* 47 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2792,7 +3552,7 @@ exports.default = function (imageFrame, rgbaBuffer) {
 };
 
 /***/ }),
-/* 42 */
+/* 48 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2827,7 +3587,7 @@ exports.default = function (imageFrame, rgbaBuffer) {
 };
 
 /***/ }),
-/* 43 */
+/* 49 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2864,7 +3624,7 @@ exports.default = function (imageFrame, rgbaBuffer) {
 };
 
 /***/ }),
-/* 44 */
+/* 50 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2931,7 +3691,7 @@ function convertLUTto8Bit(lut, shift) {
  */
 
 /***/ }),
-/* 45 */
+/* 51 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2943,27 +3703,27 @@ Object.defineProperty(exports, "__esModule", {
 
 var _externalModules = __webpack_require__(0);
 
-var _getNumberValues = __webpack_require__(16);
+var _getNumberValues = __webpack_require__(24);
 
 var _getNumberValues2 = _interopRequireDefault(_getNumberValues);
 
-var _parseImageId = __webpack_require__(4);
+var _parseImageId = __webpack_require__(7);
 
 var _parseImageId2 = _interopRequireDefault(_parseImageId);
 
-var _dataSetCacheManager = __webpack_require__(8);
+var _dataSetCacheManager = __webpack_require__(16);
 
 var _dataSetCacheManager2 = _interopRequireDefault(_dataSetCacheManager);
 
-var _getImagePixelModule = __webpack_require__(13);
+var _getImagePixelModule = __webpack_require__(21);
 
 var _getImagePixelModule2 = _interopRequireDefault(_getImagePixelModule);
 
-var _getLUTs = __webpack_require__(14);
+var _getLUTs = __webpack_require__(22);
 
 var _getLUTs2 = _interopRequireDefault(_getLUTs);
 
-var _getModalityLUTOutputPixelRepresentation = __webpack_require__(15);
+var _getModalityLUTOutputPixelRepresentation = __webpack_require__(23);
 
 var _getModalityLUTOutputPixelRepresentation2 = _interopRequireDefault(_getModalityLUTOutputPixelRepresentation);
 
@@ -3087,13 +3847,13 @@ function metaDataProvider(type, imageId) {
 exports.default = metaDataProvider;
 
 /***/ }),
-/* 46 */
+/* 52 */
 /***/ (function(module, exports) {
 
-module.exports = __WEBPACK_EXTERNAL_MODULE_46__;
+module.exports = __WEBPACK_EXTERNAL_MODULE_52__;
 
 /***/ }),
-/* 47 */
+/* 53 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3103,11 +3863,11 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-var _index = __webpack_require__(17);
+var _index = __webpack_require__(25);
 
 var _index2 = _interopRequireDefault(_index);
 
-var _index3 = __webpack_require__(11);
+var _index3 = __webpack_require__(19);
 
 var _index4 = _interopRequireDefault(_index3);
 
@@ -3127,7 +3887,7 @@ function registerLoaders(cornerstone) {
 exports.default = registerLoaders;
 
 /***/ }),
-/* 48 */
+/* 54 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3164,7 +3924,7 @@ function getNumberString(element, index, defaultValue) {
 exports.default = getNumberString;
 
 /***/ }),
-/* 49 */
+/* 55 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3176,7 +3936,7 @@ Object.defineProperty(exports, "__esModule", {
 
 var _externalModules = __webpack_require__(0);
 
-var _getNumberValues = __webpack_require__(20);
+var _getNumberValues = __webpack_require__(28);
 
 var _getNumberValues2 = _interopRequireDefault(_getNumberValues);
 
@@ -3184,11 +3944,11 @@ var _getValue = __webpack_require__(3);
 
 var _getValue2 = _interopRequireDefault(_getValue);
 
-var _getNumberValue = __webpack_require__(19);
+var _getNumberValue = __webpack_require__(27);
 
 var _getNumberValue2 = _interopRequireDefault(_getNumberValue);
 
-var _metaDataManager = __webpack_require__(5);
+var _metaDataManager = __webpack_require__(8);
 
 var _metaDataManager2 = _interopRequireDefault(_metaDataManager);
 
@@ -3323,7 +4083,7 @@ function metaDataProvider(type, imageId) {
 exports.default = metaDataProvider;
 
 /***/ }),
-/* 50 */
+/* 56 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3335,7 +4095,7 @@ Object.defineProperty(exports, "__esModule", {
 
 var _externalModules = __webpack_require__(0);
 
-var _options = __webpack_require__(6);
+var _options = __webpack_require__(4);
 
 function xhrRequest(url, imageId) {
   var headers = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
@@ -3451,7 +4211,7 @@ function xhrRequest(url, imageId) {
 exports.default = xhrRequest;
 
 /***/ }),
-/* 51 */
+/* 57 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3467,16 +4227,16 @@ exports.default = function (cornerstone) {
   cornerstone.metaData.addProvider(_index.metaDataProvider);
 };
 
-var _loadImage = __webpack_require__(23);
+var _loadImage = __webpack_require__(31);
 
 var _loadImage2 = _interopRequireDefault(_loadImage);
 
-var _index = __webpack_require__(18);
+var _index = __webpack_require__(26);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 /***/ }),
-/* 52 */
+/* 58 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3486,11 +4246,11 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-var _getEncapsulatedImageFrame = __webpack_require__(32);
+var _getEncapsulatedImageFrame = __webpack_require__(40);
 
 var _getEncapsulatedImageFrame2 = _interopRequireDefault(_getEncapsulatedImageFrame);
 
-var _getUncompressedImageFrame = __webpack_require__(33);
+var _getUncompressedImageFrame = __webpack_require__(41);
 
 var _getUncompressedImageFrame2 = _interopRequireDefault(_getUncompressedImageFrame);
 
@@ -3511,7 +4271,7 @@ function getPixelData(dataSet) {
 exports.default = getPixelData;
 
 /***/ }),
-/* 53 */
+/* 59 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3531,12 +4291,12 @@ exports.default = function (cornerstone) {
   cornerstone.metaData.addProvider(_index.metaDataProvider);
 };
 
-var _loadImage = __webpack_require__(36);
+var _loadImage = __webpack_require__(44);
 
-var _index = __webpack_require__(12);
+var _index = __webpack_require__(20);
 
 /***/ }),
-/* 54 */
+/* 60 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";

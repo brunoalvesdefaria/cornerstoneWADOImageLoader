@@ -1,4 +1,4 @@
-/*! cornerstone-wado-image-loader - 2.0.0 - 2017-12-08 | (c) 2016 Chris Hafey | https://github.com/cornerstonejs/cornerstoneWADOImageLoader */
+/*! cornerstone-wado-image-loader - 2.0.0 - 2018-04-06 | (c) 2016 Chris Hafey | https://github.com/cornerstonejs/cornerstoneWADOImageLoader */
 (function webpackUniversalModuleDefinition(root, factory) {
 	if(typeof exports === 'object' && typeof module === 'object')
 		module.exports = factory();
@@ -8,7 +8,7 @@
 		exports["cornerstoneWADOImageLoaderWebWorker"] = factory();
 	else
 		root["cornerstoneWADOImageLoaderWebWorker"] = factory();
-})(this, function() {
+})(typeof self !== 'undefined' ? self : this, function() {
 return /******/ (function(modules) { // webpackBootstrap
 /******/ 	// The module cache
 /******/ 	var installedModules = {};
@@ -71,488 +71,12 @@ return /******/ (function(modules) { // webpackBootstrap
 /******/ 	__webpack_require__.p = "";
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 55);
+/******/ 	return __webpack_require__(__webpack_require__.s = 61);
 /******/ })
 /************************************************************************/
 /******/ ({
 
-/***/ 2:
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-function getMinMax(storedPixelData) {
-  // we always calculate the min max values since they are not always
-  // present in DICOM and we don't want to trust them anyway as cornerstone
-  // depends on us providing reliable values for these
-  var min = storedPixelData[0];
-  var max = storedPixelData[0];
-  var storedPixel = void 0;
-  var numPixels = storedPixelData.length;
-
-  for (var index = 1; index < numPixels; index++) {
-    storedPixel = storedPixelData[index];
-    min = Math.min(min, storedPixel);
-    max = Math.max(max, storedPixel);
-  }
-
-  return {
-    min: min,
-    max: max
-  };
-}
-
-exports.default = getMinMax;
-
-/***/ }),
-
-/***/ 37:
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-function decodeJpx(imageFrame, pixelData) {
-  var jpxImage = new JpxImage();
-
-  jpxImage.parse(pixelData);
-
-  var tileCount = jpxImage.tiles.length;
-
-  if (tileCount !== 1) {
-    throw new Error('JPEG2000 decoder returned a tileCount of ' + tileCount + ', when 1 is expected');
-  }
-
-  imageFrame.columns = jpxImage.width;
-  imageFrame.rows = jpxImage.height;
-  imageFrame.pixelData = jpxImage.tiles[0].items;
-
-  return imageFrame;
-}
-
-var openJPEG = void 0;
-
-function decodeOpenJPEG(data, bytesPerPixel, signed) {
-  var dataPtr = openJPEG._malloc(data.length);
-
-  openJPEG.writeArrayToMemory(data, dataPtr);
-
-  // create param outpout
-  var imagePtrPtr = openJPEG._malloc(4);
-  var imageSizePtr = openJPEG._malloc(4);
-  var imageSizeXPtr = openJPEG._malloc(4);
-  var imageSizeYPtr = openJPEG._malloc(4);
-  var imageSizeCompPtr = openJPEG._malloc(4);
-
-  var t0 = new Date().getTime();
-  var ret = openJPEG.ccall('jp2_decode', 'number', ['number', 'number', 'number', 'number', 'number', 'number', 'number'], [dataPtr, data.length, imagePtrPtr, imageSizePtr, imageSizeXPtr, imageSizeYPtr, imageSizeCompPtr]);
-  // add num vomp..etc
-
-  if (ret !== 0) {
-    console.log('[opj_decode] decoding failed!');
-    openJPEG._free(dataPtr);
-    openJPEG._free(openJPEG.getValue(imagePtrPtr, '*'));
-    openJPEG._free(imageSizeXPtr);
-    openJPEG._free(imageSizeYPtr);
-    openJPEG._free(imageSizePtr);
-    openJPEG._free(imageSizeCompPtr);
-
-    return;
-  }
-
-  var imagePtr = openJPEG.getValue(imagePtrPtr, '*');
-
-  var image = {
-    length: openJPEG.getValue(imageSizePtr, 'i32'),
-    sx: openJPEG.getValue(imageSizeXPtr, 'i32'),
-    sy: openJPEG.getValue(imageSizeYPtr, 'i32'),
-    nbChannels: openJPEG.getValue(imageSizeCompPtr, 'i32'), // hard coded for now
-    perf_timetodecode: undefined,
-    pixelData: undefined
-  };
-
-  // Copy the data from the EMSCRIPTEN heap into the correct type array
-  var length = image.sx * image.sy * image.nbChannels;
-  var src32 = new Int32Array(openJPEG.HEAP32.buffer, imagePtr, length);
-
-  if (bytesPerPixel === 1) {
-    if (Uint8Array.from) {
-      image.pixelData = Uint8Array.from(src32);
-    } else {
-      image.pixelData = new Uint8Array(length);
-      for (var i = 0; i < length; i++) {
-        image.pixelData[i] = src32[i];
-      }
-    }
-  } else if (signed) {
-    if (Int16Array.from) {
-      image.pixelData = Int16Array.from(src32);
-    } else {
-      image.pixelData = new Int16Array(length);
-      for (var _i = 0; _i < length; _i++) {
-        image.pixelData[_i] = src32[_i];
-      }
-    }
-  } else if (Uint16Array.from) {
-    image.pixelData = Uint16Array.from(src32);
-  } else {
-    image.pixelData = new Uint16Array(length);
-    for (var _i2 = 0; _i2 < length; _i2++) {
-      image.pixelData[_i2] = src32[_i2];
-    }
-  }
-
-  var t1 = new Date().getTime();
-
-  image.perf_timetodecode = t1 - t0;
-
-  // free
-  openJPEG._free(dataPtr);
-  openJPEG._free(imagePtrPtr);
-  openJPEG._free(imagePtr);
-  openJPEG._free(imageSizePtr);
-  openJPEG._free(imageSizeXPtr);
-  openJPEG._free(imageSizeYPtr);
-  openJPEG._free(imageSizeCompPtr);
-
-  return image;
-}
-
-function decodeOpenJpeg2000(imageFrame, pixelData) {
-  var bytesPerPixel = imageFrame.bitsAllocated <= 8 ? 1 : 2;
-  var signed = imageFrame.pixelRepresentation === 1;
-
-  var image = decodeOpenJPEG(pixelData, bytesPerPixel, signed);
-
-  imageFrame.columns = image.sx;
-  imageFrame.rows = image.sy;
-  imageFrame.pixelData = image.pixelData;
-  if (image.nbChannels > 1) {
-    imageFrame.photometricInterpretation = 'RGB';
-  }
-
-  return imageFrame;
-}
-
-function initializeJPEG2000(decodeConfig) {
-  // check to make sure codec is loaded
-  if (!decodeConfig.usePDFJS) {
-    if (typeof OpenJPEG === 'undefined') {
-      throw new Error('OpenJPEG decoder not loaded');
-    }
-  }
-
-  if (!openJPEG) {
-    openJPEG = OpenJPEG();
-    if (!openJPEG || !openJPEG._jp2_decode) {
-      throw new Error('OpenJPEG failed to initialize');
-    }
-  }
-}
-
-function decodeJPEG2000(imageFrame, pixelData, decodeConfig) {
-  var options = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : {};
-
-  initializeJPEG2000(decodeConfig);
-
-  if (options.usePDFJS || decodeConfig.usePDFJS) {
-    // OHIF image-JPEG2000 https://github.com/OHIF/image-JPEG2000
-    // console.log('PDFJS')
-    return decodeJpx(imageFrame, pixelData);
-  }
-
-  // OpenJPEG2000 https://github.com/jpambrun/openjpeg
-  // console.log('OpenJPEG')
-  return decodeOpenJpeg2000(imageFrame, pixelData);
-}
-
-exports.default = decodeJPEG2000;
-exports.initializeJPEG2000 = initializeJPEG2000;
-
-/***/ }),
-
-/***/ 38:
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-var charLS = void 0;
-
-function jpegLSDecode(data, isSigned) {
-  // prepare input parameters
-  var dataPtr = charLS._malloc(data.length);
-
-  charLS.writeArrayToMemory(data, dataPtr);
-
-  // prepare output parameters
-  var imagePtrPtr = charLS._malloc(4);
-  var imageSizePtr = charLS._malloc(4);
-  var widthPtr = charLS._malloc(4);
-  var heightPtr = charLS._malloc(4);
-  var bitsPerSamplePtr = charLS._malloc(4);
-  var stridePtr = charLS._malloc(4);
-  var allowedLossyErrorPtr = charLS._malloc(4);
-  var componentsPtr = charLS._malloc(4);
-  var interleaveModePtr = charLS._malloc(4);
-
-  // Decode the image
-  var result = charLS.ccall('jpegls_decode', 'number', ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'], [dataPtr, data.length, imagePtrPtr, imageSizePtr, widthPtr, heightPtr, bitsPerSamplePtr, stridePtr, componentsPtr, allowedLossyErrorPtr, interleaveModePtr]);
-
-  // Extract result values into object
-  var image = {
-    result: result,
-    width: charLS.getValue(widthPtr, 'i32'),
-    height: charLS.getValue(heightPtr, 'i32'),
-    bitsPerSample: charLS.getValue(bitsPerSamplePtr, 'i32'),
-    stride: charLS.getValue(stridePtr, 'i32'),
-    components: charLS.getValue(componentsPtr, 'i32'),
-    allowedLossyError: charLS.getValue(allowedLossyErrorPtr, 'i32'),
-    interleaveMode: charLS.getValue(interleaveModePtr, 'i32'),
-    pixelData: undefined
-  };
-
-  // Copy image from emscripten heap into appropriate array buffer type
-  var imagePtr = charLS.getValue(imagePtrPtr, '*');
-
-  if (image.bitsPerSample <= 8) {
-    image.pixelData = new Uint8Array(image.width * image.height * image.components);
-    image.pixelData.set(new Uint8Array(charLS.HEAP8.buffer, imagePtr, image.pixelData.length));
-  } else if (isSigned) {
-    image.pixelData = new Int16Array(image.width * image.height * image.components);
-    image.pixelData.set(new Int16Array(charLS.HEAP16.buffer, imagePtr, image.pixelData.length));
-  } else {
-    image.pixelData = new Uint16Array(image.width * image.height * image.components);
-    image.pixelData.set(new Uint16Array(charLS.HEAP16.buffer, imagePtr, image.pixelData.length));
-  }
-
-  // free memory and return image object
-  charLS._free(dataPtr);
-  charLS._free(imagePtr);
-  charLS._free(imagePtrPtr);
-  charLS._free(imageSizePtr);
-  charLS._free(widthPtr);
-  charLS._free(heightPtr);
-  charLS._free(bitsPerSamplePtr);
-  charLS._free(stridePtr);
-  charLS._free(componentsPtr);
-  charLS._free(interleaveModePtr);
-
-  return image;
-}
-
-function initializeJPEGLS() {
-  // check to make sure codec is loaded
-  if (typeof CharLS === 'undefined') {
-    throw new Error('No JPEG-LS decoder loaded');
-  }
-
-  // Try to initialize CharLS
-  // CharLS https://github.com/cornerstonejs/charls
-  if (!charLS) {
-    charLS = CharLS();
-    if (!charLS || !charLS._jpegls_decode) {
-      throw new Error('JPEG-LS failed to initialize');
-    }
-  }
-}
-
-function decodeJPEGLS(imageFrame, pixelData) {
-  initializeJPEGLS();
-
-  var image = jpegLSDecode(pixelData, imageFrame.pixelRepresentation === 1);
-
-  // throw error if not success or too much data
-  if (image.result !== 0 && image.result !== 6) {
-    throw new Error('JPEG-LS decoder failed to decode frame (error code ' + image.result + ')');
-  }
-
-  imageFrame.columns = image.width;
-  imageFrame.rows = image.height;
-  imageFrame.pixelData = image.pixelData;
-
-  return imageFrame;
-}
-
-exports.default = decodeJPEGLS;
-exports.initializeJPEGLS = initializeJPEGLS;
-
-/***/ }),
-
-/***/ 55:
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.version = exports.registerTaskHandler = undefined;
-
-var _version = __webpack_require__(9);
-
-Object.defineProperty(exports, 'version', {
-  enumerable: true,
-  get: function get() {
-    return _interopRequireDefault(_version).default;
-  }
-});
-
-var _webWorker = __webpack_require__(56);
-
-var _decodeTask = __webpack_require__(57);
-
-var _decodeTask2 = _interopRequireDefault(_decodeTask);
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-// register our task
-(0, _webWorker.registerTaskHandler)(_decodeTask2.default);
-
-exports.registerTaskHandler = _webWorker.registerTaskHandler;
-
-/***/ }),
-
-/***/ 56:
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.registerTaskHandler = registerTaskHandler;
-// an object of task handlers
-var taskHandlers = {};
-
-// Flag to ensure web worker is only initialized once
-var initialized = false;
-
-// the configuration object passed in when the web worker manager is initialized
-var config = void 0;
-
-/**
- * Initialization function that loads additional web workers and initializes them
- * @param data
- */
-function initialize(data) {
-  // console.log('web worker initialize ', data.workerIndex);
-  // prevent initialization from happening more than once
-  if (initialized) {
-    return;
-  }
-
-  // save the config data
-  config = data.config;
-
-  // load any additional web worker tasks
-  if (data.config.webWorkerTaskPaths) {
-    for (var i = 0; i < data.config.webWorkerTaskPaths.length; i++) {
-      self.importScripts(data.config.webWorkerTaskPaths[i]);
-    }
-  }
-
-  // initialize each task handler
-  Object.keys(taskHandlers).forEach(function (key) {
-    taskHandlers[key].initialize(config.taskConfiguration);
-  });
-
-  // tell main ui thread that we have completed initialization
-  self.postMessage({
-    taskType: 'initialize',
-    status: 'success',
-    result: {},
-    workerIndex: data.workerIndex
-  });
-
-  initialized = true;
-}
-
-/**
- * Function exposed to web worker tasks to register themselves
- * @param taskHandler
- */
-function registerTaskHandler(taskHandler) {
-  if (taskHandlers[taskHandler.taskType]) {
-    console.log('attempt to register duplicate task handler "', taskHandler.taskType, '"');
-
-    return false;
-  }
-  taskHandlers[taskHandler.taskType] = taskHandler;
-  if (initialized) {
-    taskHandler.initialize(config.taskConfiguration);
-  }
-}
-
-/**
- * Function to load a new web worker task with updated configuration
- * @param data
- */
-function loadWebWorkerTask(data) {
-  config = data.config;
-  self.importScripts(data.sourcePath);
-}
-
-/**
- * Web worker message handler - dispatches messages to the registered task handlers
- * @param msg
- */
-self.onmessage = function (msg) {
-  // console.log('web worker onmessage', msg.data);
-
-  // handle initialize message
-  if (msg.data.taskType === 'initialize') {
-    initialize(msg.data);
-
-    return;
-  }
-
-  // handle loadWebWorkerTask message
-  if (msg.data.taskType === 'loadWebWorkerTask') {
-    loadWebWorkerTask(msg.data);
-
-    return;
-  }
-
-  // dispatch the message if there is a handler registered for it
-  if (taskHandlers[msg.data.taskType]) {
-    taskHandlers[msg.data.taskType].handler(msg.data, function (result, transferList) {
-      self.postMessage({
-        taskType: msg.data.taskType,
-        status: 'success',
-        result: result,
-        workerIndex: msg.data.workerIndex
-      }, transferList);
-    });
-
-    return;
-  }
-
-  // not task handler registered - send a failure message back to ui thread
-  console.log('no task handler for ', msg.data.taskType);
-  console.log(taskHandlers);
-  self.postMessage({
-    taskType: msg.data.taskType,
-    status: 'failed - no task handler registered',
-    workerIndex: msg.data.workerIndex
-  });
-};
-
-/***/ }),
-
-/***/ 57:
+/***/ 10:
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -562,151 +86,31 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-var _decodeJPEG = __webpack_require__(37);
-
-var _decodeJPEGLS = __webpack_require__(38);
-
-var _getMinMax = __webpack_require__(2);
-
-var _getMinMax2 = _interopRequireDefault(_getMinMax);
-
-var _decodeImageFrame = __webpack_require__(58);
-
-var _decodeImageFrame2 = _interopRequireDefault(_decodeImageFrame);
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-// flag to ensure codecs are loaded only once
-var codecsLoaded = false;
-
-// the configuration object for the decodeTask
-var decodeConfig = void 0;
-
-/**
- * Function to control loading and initializing the codecs
- * @param config
- */
-function loadCodecs(config) {
-  // prevent loading codecs more than once
-  if (codecsLoaded) {
-    return;
-  }
-
-  // Load the codecs
-  // console.time('loadCodecs');
-  self.importScripts(config.decodeTask.codecsPath);
-  codecsLoaded = true;
-  // console.timeEnd('loadCodecs');
-
-  // Initialize the codecs
-  if (config.decodeTask.initializeCodecsOnStartup) {
-    // console.time('initializeCodecs');
-    (0, _decodeJPEG.initializeJPEG2000)(config.decodeTask);
-    (0, _decodeJPEGLS.initializeJPEGLS)(config.decodeTask);
-    // console.timeEnd('initializeCodecs');
-  }
-}
-
-/**
- * Task initialization function
- */
-function initialize(config) {
-  decodeConfig = config;
-  if (config.decodeTask.loadCodecsOnStartup) {
-    loadCodecs(config);
-  }
-}
-
-function calculateMinMax(imageFrame) {
-  var minMax = (0, _getMinMax2.default)(imageFrame.pixelData);
-
-  if (decodeConfig.decodeTask.strict === true) {
-    if (imageFrame.smallestPixelValue !== minMax.min) {
-      console.warn('Image smallestPixelValue tag is incorrect. Rendering performance will suffer considerably.');
-    }
-
-    if (imageFrame.largestPixelValue !== minMax.max) {
-      console.warn('Image largestPixelValue tag is incorrect. Rendering performance will suffer considerably.');
-    }
-  } else {
-    imageFrame.smallestPixelValue = minMax.min;
-    imageFrame.largestPixelValue = minMax.max;
-  }
-}
-
-/**
- * Task handler function
- */
-function handler(data, doneCallback) {
-  // Load the codecs if they aren't already loaded
-  loadCodecs(decodeConfig);
-
-  var imageFrame = data.data.imageFrame;
-
-  // convert pixel data from ArrayBuffer to Uint8Array since web workers support passing ArrayBuffers but
-  // not typed arrays
-  var pixelData = new Uint8Array(data.data.pixelData);
-
-  (0, _decodeImageFrame2.default)(imageFrame, data.data.transferSyntax, pixelData, decodeConfig.decodeTask, data.data.options);
-
-  if (!imageFrame.pixelData) {
-    throw new Error('decodeTask: imageFrame.pixelData is undefined after decoding');
-  }
-
-  calculateMinMax(imageFrame);
-
-  // convert from TypedArray to ArrayBuffer since web workers support passing ArrayBuffers but not
-  // typed arrays
-  imageFrame.pixelData = imageFrame.pixelData.buffer;
-
-  // invoke the callback with our result and pass the pixelData in the transferList to move it to
-  // UI thread without making a copy
-  doneCallback(imageFrame, [imageFrame.pixelData]);
-}
-
-exports.default = {
-  taskType: 'decodeTask',
-  handler: handler,
-  initialize: initialize
-};
-
-/***/ }),
-
-/***/ 58:
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-var _decodeLittleEndian = __webpack_require__(59);
+var _decodeLittleEndian = __webpack_require__(11);
 
 var _decodeLittleEndian2 = _interopRequireDefault(_decodeLittleEndian);
 
-var _decodeBigEndian = __webpack_require__(60);
+var _decodeBigEndian = __webpack_require__(12);
 
 var _decodeBigEndian2 = _interopRequireDefault(_decodeBigEndian);
 
-var _decodeRLE = __webpack_require__(61);
+var _decodeRLE = __webpack_require__(13);
 
 var _decodeRLE2 = _interopRequireDefault(_decodeRLE);
 
-var _decodeJPEGBaseline = __webpack_require__(62);
+var _decodeJPEGBaseline = __webpack_require__(14);
 
 var _decodeJPEGBaseline2 = _interopRequireDefault(_decodeJPEGBaseline);
 
-var _decodeJPEGLossless = __webpack_require__(63);
+var _decodeJPEGLossless = __webpack_require__(15);
 
 var _decodeJPEGLossless2 = _interopRequireDefault(_decodeJPEGLossless);
 
-var _decodeJPEGLS = __webpack_require__(38);
+var _decodeJPEGLS = __webpack_require__(5);
 
 var _decodeJPEGLS2 = _interopRequireDefault(_decodeJPEGLS);
 
-var _decodeJPEG = __webpack_require__(37);
+var _decodeJPEG = __webpack_require__(6);
 
 var _decodeJPEG2 = _interopRequireDefault(_decodeJPEG);
 
@@ -782,7 +186,7 @@ exports.default = decodeImageFrame;
 
 /***/ }),
 
-/***/ 59:
+/***/ 11:
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -828,7 +232,7 @@ exports.default = decodeLittleEndian;
 
 /***/ }),
 
-/***/ 60:
+/***/ 12:
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -875,7 +279,7 @@ exports.default = decodeBigEndian;
 
 /***/ }),
 
-/***/ 61:
+/***/ 13:
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -1050,7 +454,7 @@ exports.default = decodeRLE;
 
 /***/ }),
 
-/***/ 62:
+/***/ 14:
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -1089,7 +493,7 @@ exports.default = decodeJPEGBaseline;
 
 /***/ }),
 
-/***/ 63:
+/***/ 15:
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -1133,7 +537,7 @@ exports.default = decodeJPEGLossless;
 
 /***/ }),
 
-/***/ 9:
+/***/ 17:
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -1143,6 +547,602 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 exports.default = '2.0.0';
+
+/***/ }),
+
+/***/ 2:
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+function getMinMax(storedPixelData) {
+  // we always calculate the min max values since they are not always
+  // present in DICOM and we don't want to trust them anyway as cornerstone
+  // depends on us providing reliable values for these
+  var min = storedPixelData[0];
+  var max = storedPixelData[0];
+  var storedPixel = void 0;
+  var numPixels = storedPixelData.length;
+
+  for (var index = 1; index < numPixels; index++) {
+    storedPixel = storedPixelData[index];
+    min = Math.min(min, storedPixel);
+    max = Math.max(max, storedPixel);
+  }
+
+  return {
+    min: min,
+    max: max
+  };
+}
+
+exports.default = getMinMax;
+
+/***/ }),
+
+/***/ 5:
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+var charLS = void 0;
+
+function jpegLSDecode(data, isSigned) {
+  // prepare input parameters
+  var dataPtr = charLS._malloc(data.length);
+
+  charLS.writeArrayToMemory(data, dataPtr);
+
+  // prepare output parameters
+  var imagePtrPtr = charLS._malloc(4);
+  var imageSizePtr = charLS._malloc(4);
+  var widthPtr = charLS._malloc(4);
+  var heightPtr = charLS._malloc(4);
+  var bitsPerSamplePtr = charLS._malloc(4);
+  var stridePtr = charLS._malloc(4);
+  var allowedLossyErrorPtr = charLS._malloc(4);
+  var componentsPtr = charLS._malloc(4);
+  var interleaveModePtr = charLS._malloc(4);
+
+  // Decode the image
+  var result = charLS.ccall('jpegls_decode', 'number', ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'], [dataPtr, data.length, imagePtrPtr, imageSizePtr, widthPtr, heightPtr, bitsPerSamplePtr, stridePtr, componentsPtr, allowedLossyErrorPtr, interleaveModePtr]);
+
+  // Extract result values into object
+  var image = {
+    result: result,
+    width: charLS.getValue(widthPtr, 'i32'),
+    height: charLS.getValue(heightPtr, 'i32'),
+    bitsPerSample: charLS.getValue(bitsPerSamplePtr, 'i32'),
+    stride: charLS.getValue(stridePtr, 'i32'),
+    components: charLS.getValue(componentsPtr, 'i32'),
+    allowedLossyError: charLS.getValue(allowedLossyErrorPtr, 'i32'),
+    interleaveMode: charLS.getValue(interleaveModePtr, 'i32'),
+    pixelData: undefined
+  };
+
+  // Copy image from emscripten heap into appropriate array buffer type
+  var imagePtr = charLS.getValue(imagePtrPtr, '*');
+
+  if (image.bitsPerSample <= 8) {
+    image.pixelData = new Uint8Array(image.width * image.height * image.components);
+    image.pixelData.set(new Uint8Array(charLS.HEAP8.buffer, imagePtr, image.pixelData.length));
+  } else if (isSigned) {
+    image.pixelData = new Int16Array(image.width * image.height * image.components);
+    image.pixelData.set(new Int16Array(charLS.HEAP16.buffer, imagePtr, image.pixelData.length));
+  } else {
+    image.pixelData = new Uint16Array(image.width * image.height * image.components);
+    image.pixelData.set(new Uint16Array(charLS.HEAP16.buffer, imagePtr, image.pixelData.length));
+  }
+
+  // free memory and return image object
+  charLS._free(dataPtr);
+  charLS._free(imagePtr);
+  charLS._free(imagePtrPtr);
+  charLS._free(imageSizePtr);
+  charLS._free(widthPtr);
+  charLS._free(heightPtr);
+  charLS._free(bitsPerSamplePtr);
+  charLS._free(stridePtr);
+  charLS._free(componentsPtr);
+  charLS._free(interleaveModePtr);
+
+  return image;
+}
+
+function initializeJPEGLS() {
+  // check to make sure codec is loaded
+  if (typeof CharLS === 'undefined') {
+    throw new Error('No JPEG-LS decoder loaded');
+  }
+
+  // Try to initialize CharLS
+  // CharLS https://github.com/cornerstonejs/charls
+  if (!charLS) {
+    charLS = CharLS();
+    if (!charLS || !charLS._jpegls_decode) {
+      throw new Error('JPEG-LS failed to initialize');
+    }
+  }
+}
+
+function decodeJPEGLS(imageFrame, pixelData) {
+  initializeJPEGLS();
+
+  var image = jpegLSDecode(pixelData, imageFrame.pixelRepresentation === 1);
+
+  // throw error if not success or too much data
+  if (image.result !== 0 && image.result !== 6) {
+    throw new Error('JPEG-LS decoder failed to decode frame (error code ' + image.result + ')');
+  }
+
+  imageFrame.columns = image.width;
+  imageFrame.rows = image.height;
+  imageFrame.pixelData = image.pixelData;
+
+  return imageFrame;
+}
+
+exports.default = decodeJPEGLS;
+exports.initializeJPEGLS = initializeJPEGLS;
+
+/***/ }),
+
+/***/ 6:
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+function decodeJpx(imageFrame, pixelData) {
+  var jpxImage = new JpxImage();
+
+  jpxImage.parse(pixelData);
+
+  var tileCount = jpxImage.tiles.length;
+
+  if (tileCount !== 1) {
+    throw new Error('JPEG2000 decoder returned a tileCount of ' + tileCount + ', when 1 is expected');
+  }
+
+  imageFrame.columns = jpxImage.width;
+  imageFrame.rows = jpxImage.height;
+  imageFrame.pixelData = jpxImage.tiles[0].items;
+
+  return imageFrame;
+}
+
+var openJPEG = void 0;
+
+function decodeOpenJPEG(data, bytesPerPixel, signed) {
+  var dataPtr = openJPEG._malloc(data.length);
+
+  openJPEG.writeArrayToMemory(data, dataPtr);
+
+  // create param outpout
+  var imagePtrPtr = openJPEG._malloc(4);
+  var imageSizePtr = openJPEG._malloc(4);
+  var imageSizeXPtr = openJPEG._malloc(4);
+  var imageSizeYPtr = openJPEG._malloc(4);
+  var imageSizeCompPtr = openJPEG._malloc(4);
+
+  var t0 = new Date().getTime();
+  var ret = openJPEG.ccall('jp2_decode', 'number', ['number', 'number', 'number', 'number', 'number', 'number', 'number'], [dataPtr, data.length, imagePtrPtr, imageSizePtr, imageSizeXPtr, imageSizeYPtr, imageSizeCompPtr]);
+  // add num vomp..etc
+
+  if (ret !== 0) {
+    console.log('[opj_decode] decoding failed!');
+    openJPEG._free(dataPtr);
+    openJPEG._free(openJPEG.getValue(imagePtrPtr, '*'));
+    openJPEG._free(imageSizeXPtr);
+    openJPEG._free(imageSizeYPtr);
+    openJPEG._free(imageSizePtr);
+    openJPEG._free(imageSizeCompPtr);
+
+    return;
+  }
+
+  var imagePtr = openJPEG.getValue(imagePtrPtr, '*');
+
+  var image = {
+    length: openJPEG.getValue(imageSizePtr, 'i32'),
+    sx: openJPEG.getValue(imageSizeXPtr, 'i32'),
+    sy: openJPEG.getValue(imageSizeYPtr, 'i32'),
+    nbChannels: openJPEG.getValue(imageSizeCompPtr, 'i32'), // hard coded for now
+    perf_timetodecode: undefined,
+    pixelData: undefined
+  };
+
+  // Copy the data from the EMSCRIPTEN heap into the correct type array
+  var length = image.sx * image.sy * image.nbChannels;
+  var src32 = new Int32Array(openJPEG.HEAP32.buffer, imagePtr, length);
+
+  if (bytesPerPixel === 1) {
+    if (Uint8Array.from) {
+      image.pixelData = Uint8Array.from(src32);
+    } else {
+      image.pixelData = new Uint8Array(length);
+      for (var i = 0; i < length; i++) {
+        image.pixelData[i] = src32[i];
+      }
+    }
+  } else if (signed) {
+    if (Int16Array.from) {
+      image.pixelData = Int16Array.from(src32);
+    } else {
+      image.pixelData = new Int16Array(length);
+      for (var _i = 0; _i < length; _i++) {
+        image.pixelData[_i] = src32[_i];
+      }
+    }
+  } else if (Uint16Array.from) {
+    image.pixelData = Uint16Array.from(src32);
+  } else {
+    image.pixelData = new Uint16Array(length);
+    for (var _i2 = 0; _i2 < length; _i2++) {
+      image.pixelData[_i2] = src32[_i2];
+    }
+  }
+
+  var t1 = new Date().getTime();
+
+  image.perf_timetodecode = t1 - t0;
+
+  // free
+  openJPEG._free(dataPtr);
+  openJPEG._free(imagePtrPtr);
+  openJPEG._free(imagePtr);
+  openJPEG._free(imageSizePtr);
+  openJPEG._free(imageSizeXPtr);
+  openJPEG._free(imageSizeYPtr);
+  openJPEG._free(imageSizeCompPtr);
+
+  return image;
+}
+
+function decodeOpenJpeg2000(imageFrame, pixelData) {
+  var bytesPerPixel = imageFrame.bitsAllocated <= 8 ? 1 : 2;
+  var signed = imageFrame.pixelRepresentation === 1;
+
+  var image = decodeOpenJPEG(pixelData, bytesPerPixel, signed);
+
+  imageFrame.columns = image.sx;
+  imageFrame.rows = image.sy;
+  imageFrame.pixelData = image.pixelData;
+  if (image.nbChannels > 1) {
+    imageFrame.photometricInterpretation = 'RGB';
+  }
+
+  return imageFrame;
+}
+
+function initializeJPEG2000(decodeConfig) {
+  // check to make sure codec is loaded
+  if (!decodeConfig.usePDFJS) {
+    if (typeof OpenJPEG === 'undefined') {
+      throw new Error('OpenJPEG decoder not loaded');
+    }
+  }
+
+  if (!openJPEG) {
+    openJPEG = OpenJPEG();
+    if (!openJPEG || !openJPEG._jp2_decode) {
+      throw new Error('OpenJPEG failed to initialize');
+    }
+  }
+}
+
+function decodeJPEG2000(imageFrame, pixelData, decodeConfig) {
+  var options = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : {};
+
+  initializeJPEG2000(decodeConfig);
+
+  if (options.usePDFJS || decodeConfig.usePDFJS) {
+    // OHIF image-JPEG2000 https://github.com/OHIF/image-JPEG2000
+    // console.log('PDFJS')
+    return decodeJpx(imageFrame, pixelData);
+  }
+
+  // OpenJPEG2000 https://github.com/jpambrun/openjpeg
+  // console.log('OpenJPEG')
+  return decodeOpenJpeg2000(imageFrame, pixelData);
+}
+
+exports.default = decodeJPEG2000;
+exports.initializeJPEG2000 = initializeJPEG2000;
+
+/***/ }),
+
+/***/ 61:
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.version = exports.registerTaskHandler = undefined;
+
+var _version = __webpack_require__(17);
+
+Object.defineProperty(exports, 'version', {
+  enumerable: true,
+  get: function get() {
+    return _interopRequireDefault(_version).default;
+  }
+});
+
+var _webWorker = __webpack_require__(62);
+
+var _decodeTask = __webpack_require__(63);
+
+var _decodeTask2 = _interopRequireDefault(_decodeTask);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+// register our task
+(0, _webWorker.registerTaskHandler)(_decodeTask2.default);
+
+exports.registerTaskHandler = _webWorker.registerTaskHandler;
+
+/***/ }),
+
+/***/ 62:
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.registerTaskHandler = registerTaskHandler;
+// an object of task handlers
+var taskHandlers = {};
+
+// Flag to ensure web worker is only initialized once
+var initialized = false;
+
+// the configuration object passed in when the web worker manager is initialized
+var config = void 0;
+
+/**
+ * Initialization function that loads additional web workers and initializes them
+ * @param data
+ */
+function initialize(data) {
+  // console.log('web worker initialize ', data.workerIndex);
+  // prevent initialization from happening more than once
+  if (initialized) {
+    return;
+  }
+
+  // save the config data
+  config = data.config;
+
+  // load any additional web worker tasks
+  if (data.config.webWorkerTaskPaths) {
+    for (var i = 0; i < data.config.webWorkerTaskPaths.length; i++) {
+      self.importScripts(data.config.webWorkerTaskPaths[i]);
+    }
+  }
+
+  // initialize each task handler
+  Object.keys(taskHandlers).forEach(function (key) {
+    taskHandlers[key].initialize(config.taskConfiguration);
+  });
+
+  // tell main ui thread that we have completed initialization
+  self.postMessage({
+    taskType: 'initialize',
+    status: 'success',
+    result: {},
+    workerIndex: data.workerIndex
+  });
+
+  initialized = true;
+}
+
+/**
+ * Function exposed to web worker tasks to register themselves
+ * @param taskHandler
+ */
+function registerTaskHandler(taskHandler) {
+  if (taskHandlers[taskHandler.taskType]) {
+    console.log('attempt to register duplicate task handler "', taskHandler.taskType, '"');
+
+    return false;
+  }
+  taskHandlers[taskHandler.taskType] = taskHandler;
+  if (initialized) {
+    taskHandler.initialize(config.taskConfiguration);
+  }
+}
+
+/**
+ * Function to load a new web worker task with updated configuration
+ * @param data
+ */
+function loadWebWorkerTask(data) {
+  config = data.config;
+  self.importScripts(data.sourcePath);
+}
+
+/**
+ * Web worker message handler - dispatches messages to the registered task handlers
+ * @param msg
+ */
+self.onmessage = function (msg) {
+  // console.log('web worker onmessage', msg.data);
+
+  // handle initialize message
+  if (msg.data.taskType === 'initialize') {
+    initialize(msg.data);
+
+    return;
+  }
+
+  // handle loadWebWorkerTask message
+  if (msg.data.taskType === 'loadWebWorkerTask') {
+    loadWebWorkerTask(msg.data);
+
+    return;
+  }
+
+  // dispatch the message if there is a handler registered for it
+  if (taskHandlers[msg.data.taskType]) {
+    taskHandlers[msg.data.taskType].handler(msg.data, function (result, transferList) {
+      self.postMessage({
+        taskType: msg.data.taskType,
+        status: 'success',
+        result: result,
+        workerIndex: msg.data.workerIndex
+      }, transferList);
+    });
+
+    return;
+  }
+
+  // not task handler registered - send a failure message back to ui thread
+  console.log('no task handler for ', msg.data.taskType);
+  console.log(taskHandlers);
+  self.postMessage({
+    taskType: msg.data.taskType,
+    status: 'failed - no task handler registered',
+    workerIndex: msg.data.workerIndex
+  });
+};
+
+/***/ }),
+
+/***/ 63:
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var _decodeJPEG = __webpack_require__(6);
+
+var _decodeJPEGLS = __webpack_require__(5);
+
+var _getMinMax = __webpack_require__(2);
+
+var _getMinMax2 = _interopRequireDefault(_getMinMax);
+
+var _decodeImageFrame = __webpack_require__(10);
+
+var _decodeImageFrame2 = _interopRequireDefault(_decodeImageFrame);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+// flag to ensure codecs are loaded only once
+var codecsLoaded = false;
+
+// the configuration object for the decodeTask
+var decodeConfig = void 0;
+
+/**
+ * Function to control loading and initializing the codecs
+ * @param config
+ */
+function loadCodecs(config) {
+  // prevent loading codecs more than once
+  if (codecsLoaded) {
+    return;
+  }
+
+  // Load the codecs
+  // console.time('loadCodecs');
+  self.importScripts(config.decodeTask.codecsPath);
+  codecsLoaded = true;
+  // console.timeEnd('loadCodecs');
+
+  // Initialize the codecs
+  if (config.decodeTask.initializeCodecsOnStartup) {
+    // console.time('initializeCodecs');
+    (0, _decodeJPEG.initializeJPEG2000)(config.decodeTask);
+    (0, _decodeJPEGLS.initializeJPEGLS)(config.decodeTask);
+    // console.timeEnd('initializeCodecs');
+  }
+}
+
+/**
+ * Task initialization function
+ */
+function initialize(config) {
+  decodeConfig = config;
+  if (config.decodeTask.loadCodecsOnStartup) {
+    loadCodecs(config);
+  }
+}
+
+function calculateMinMax(imageFrame) {
+  var minMax = (0, _getMinMax2.default)(imageFrame.pixelData);
+
+  if (decodeConfig.decodeTask.strict === true) {
+    if (imageFrame.smallestPixelValue !== minMax.min) {
+      console.warn('Image smallestPixelValue tag is incorrect. Rendering performance will suffer considerably.');
+    }
+
+    if (imageFrame.largestPixelValue !== minMax.max) {
+      console.warn('Image largestPixelValue tag is incorrect. Rendering performance will suffer considerably.');
+    }
+  } else {
+    imageFrame.smallestPixelValue = minMax.min;
+    imageFrame.largestPixelValue = minMax.max;
+  }
+}
+
+/**
+ * Task handler function
+ */
+function handler(data, doneCallback) {
+  // Load the codecs if they aren't already loaded
+  loadCodecs(decodeConfig);
+
+  var imageFrame = data.data.imageFrame;
+
+  // convert pixel data from ArrayBuffer to Uint8Array since web workers support passing ArrayBuffers but
+  // not typed arrays
+  var pixelData = new Uint8Array(data.data.pixelData);
+
+  (0, _decodeImageFrame2.default)(imageFrame, data.data.transferSyntax, pixelData, decodeConfig.decodeTask, data.data.options);
+
+  if (!imageFrame.pixelData) {
+    throw new Error('decodeTask: imageFrame.pixelData is undefined after decoding');
+  }
+
+  calculateMinMax(imageFrame);
+
+  // convert from TypedArray to ArrayBuffer since web workers support passing ArrayBuffers but not
+  // typed arrays
+  imageFrame.pixelData = imageFrame.pixelData.buffer;
+
+  // invoke the callback with our result and pass the pixelData in the transferList to move it to
+  // UI thread without making a copy
+  doneCallback(imageFrame, [imageFrame.pixelData]);
+}
+
+exports.default = {
+  taskType: 'decodeTask',
+  handler: handler,
+  initialize: initialize
+};
 
 /***/ })
 
